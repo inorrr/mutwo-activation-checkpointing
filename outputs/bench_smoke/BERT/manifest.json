@@ -1,0 +1,50 @@
+{
+  "model_name": "BERT",
+  "batch_sizes": [
+    1
+  ],
+  "runs": [
+    {
+      "model_name": "BERT",
+      "batch_size": 1,
+      "use_activation_checkpointing": false,
+      "latency_ms_avg": 61.01049995049834,
+      "latency_ms_std": 7.022188186645508,
+      "peak_memory_bytes_avg": 1774616064.0,
+      "peak_memory_bytes_max": 1774616064.0,
+      "correctness_ok": null,
+      "output_dir": "outputs\\bench_smoke\\BERT\\bs_1\\baseline",
+      "profiler_summary_path": "outputs\\bench_smoke\\BERT\\bs_1\\baseline\\profiler_summary.json",
+      "profiler_breakdown_plot": "outputs\\bench_smoke\\BERT\\bs_1\\baseline\\peak_memory_breakdown.png",
+      "plan_path": null,
+      "rewritten_profiler_summary_path": null,
+      "metadata": {
+        "device": "cuda",
+        "seq_len": 64,
+        "debug_bert": true
+      }
+    },
+    {
+      "model_name": "BERT",
+      "batch_size": 1,
+      "use_activation_checkpointing": true,
+      "latency_ms_avg": 52.72936665763458,
+      "latency_ms_std": 3.5304720401763916,
+      "peak_memory_bytes_avg": 1775038976.0,
+      "peak_memory_bytes_max": 1775038976.0,
+      "correctness_ok": true,
+      "output_dir": "outputs\\bench_smoke\\BERT\\bs_1\\ac",
+      "profiler_summary_path": "outputs\\bench_smoke\\BERT\\bs_1\\ac\\profiler_summary.json",
+      "profiler_breakdown_plot": "outputs\\bench_smoke\\BERT\\bs_1\\ac\\peak_memory_breakdown.png",
+      "plan_path": "outputs\\bench_smoke\\BERT\\bs_1\\ac\\checkpoint_plan.json",
+      "rewritten_profiler_summary_path": null,
+      "metadata": {
+        "device": "cuda",
+        "seq_len": 64,
+        "debug_bert": true
+      }
+    }
+  ],
+  "memory_plot": "outputs\\bench_smoke\\BERT\\peak_memory_vs_batch_size.png",
+  "latency_plot": "outputs\\bench_smoke\\BERT\\latency_vs_batch_size.png"
+}

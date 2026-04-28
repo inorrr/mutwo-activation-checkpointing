@@ -1,33 +1,38 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
 import torch
-import torch.nn as nn
 import torch.fx as fx
-from typing import Dict
-from torch.fx.experimental.proxy_tensor import make_fx
 from torch._functorch.partitioners import _extract_graph_with_inputs_outputs
+from torch.fx.experimental.proxy_tensor import make_fx
+
+from graph_prof import ActivationInfo, GraphProfiler
 from graph_tracer import SEPFunction
 
 
-# We define a custom function that takes in two weight matrices that require
-# gradients to be computed and an input data matrix. The function returns the
-# gradients of the weight matrices with respect to the loss (sum in our
-# example). NOTE: The custom function mimics a simple two layer liner neural
-# network with relu activation functions and a sum loss function.
-def custom_fn(w1: torch.Tensor, w2: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-    z = torch.mm(w1, x)
-    z = nn.functional.relu(z)
-    z = torch.mm(z, w2)
-    z = nn.functional.relu(z)
-    z = z.sum()
-    z = SEPFunction.apply(z)
-    z.backward()
-    return w1.grad, w2.grad
+@dataclass
+class ActivationCheckpointConfig:
+    memory_budget_mb: Optional[float] = None
+    min_savings_mb: float = 1.0
+    max_recompute_ratio: float = 0.35
+    max_candidates: Optional[int] = 4
+
+
+@dataclass
+class ActivationCheckpointPlan:
+    recompute: List[str] = field(default_factory=list)
+    retain: List[str] = field(default_factory=list)
+    skipped: Dict[str, str] = field(default_factory=dict)
+    estimated_saved_bytes: int = 0
 
 
 def replace_subsequent_uses_of(
     graph: fx.Graph, old_node: fx.Node, new_node: fx.Node
 ) -> None:
-    old_node_users = old_node.users
-    for node in reversed(graph.nodes):
+    old_node_users = dict(old_node.users)
+    for node in reversed(list(graph.nodes)):
         if node == new_node:
             break
         if node in old_node_users:
@@ -35,7 +40,7 @@ def replace_subsequent_uses_of(
 
 
 def remove_detach_nodes(gm: fx.GraphModule) -> fx.GraphModule:
-    for node in gm.graph.nodes:
+    for node in list(gm.graph.nodes):
         if node.target == torch.ops.aten.detach.default:
             input_node = node.all_input_nodes[0]
             node.replace_all_uses_with(input_node)
@@ -47,109 +52,247 @@ def remove_detach_nodes(gm: fx.GraphModule) -> fx.GraphModule:
 
 
 def get_name_to_node_map(gm: fx.GraphModule) -> Dict[str, fx.Node]:
-    name_to_node = {}
-    for node in gm.graph.nodes:
-        name_to_node[node.name] = node
-    return name_to_node
+    return {node.name: node for node in gm.graph.nodes}
 
 
-def activation_checkpointing(gm: fx.GraphModule) -> fx.GraphModule:
-    # NOTE: You need to create the function for your project and call it inside
-    # the graph_transformation function after performing graph profiling.
+def _get_forward_nodes(gm: fx.GraphModule) -> Tuple[List[fx.Node], int, int]:
+    nodes = list(gm.graph.nodes)
+    sep_idx = next(
+        idx for idx, node in enumerate(nodes) if node.target == torch.ops.separator.sep.default
+    )
+    sep_bwd_idx = next(
+        idx
+        for idx, node in enumerate(nodes)
+        if node.target == torch.ops.separator.sep_backward.default
+    )
+    return nodes, sep_idx, sep_bwd_idx
 
-    # In this example we are going to recompute one of the relu activations for the
-    # backward pass instead of saving it. We know from our custom function
-    # that we have 2 intermeidate nodes: ['relu', 'relu_1']
 
-    # So the intermediate node to recompute is: ['relu'] and
-    # intermediate nodes to checkpoint (retain) are: ['relu_1']
-
-    # Nodes required to recompute 'relu' are ['w1_1', 'x_1']
-    # First back use is at node 't'
-
-    # NOTE: For your project, you will use GraphProfiler to identify the
-    # intermediate nodes, their first back access, last forward access and
-    # then MuTWO's algorithm to select the intermediate 'nodes_to_recompute' and
-    # checkpoint (retain). The 'nodes_required_to_recompute' any of the
-    # intermediate nodes MUST be a subset of the placeholder nodes and the
-    # intermediate nodes that are checkpointed.
-
+def _collect_required_inputs(
+    gm: fx.GraphModule,
+    target_name: str,
+    allowed_roots: Set[str],
+) -> Tuple[List[fx.Node], List[fx.Node]]:
+    nodes, _sep_idx, sep_bwd_idx = _get_forward_nodes(gm)
     name_to_node = get_name_to_node_map(gm)
-    first_back_access = name_to_node["t"]
-    node_to_recompute = [name_to_node["relu"]]
-    node_to_recompute_names = ["relu"]
-    nodes_required_to_recompute = [name_to_node["w1_1"], name_to_node["x_1"]]
+    target_node = name_to_node[target_name]
+    visited: Set[str] = set()
+    roots: List[fx.Node] = []
+    subgraph_nodes: List[fx.Node] = []
 
-    # NOTE: we cannot directly use 'mm' to recompute 'relu' since 'mm' is not an
-    # intermediate node that is retained (checkpointed).
+    def visit(node: fx.Node) -> None:
+        if node.name in visited:
+            return
+        visited.add(node.name)
+        idx = nodes.index(node)
+        if node.op == "placeholder" or node.name in allowed_roots:
+            roots.append(node)
+            return
+        if idx >= sep_bwd_idx:
+            return
+        for input_node in node.all_input_nodes:
+            visit(input_node)
+        subgraph_nodes.append(node)
 
-    # Obtain a sub-graph that recomputes the required nodes
+    visit(target_node)
+    roots = list(dict.fromkeys(roots))
+    subgraph_nodes = [node for node in subgraph_nodes if node.name != target_name] + [target_node]
+    return roots, subgraph_nodes
+
+
+def _extract_recompute_subgraph(
+    gm: fx.GraphModule, target_name: str, allowed_roots: Set[str]
+) -> Tuple[fx.Graph, List[fx.Node]]:
+    name_to_node = get_name_to_node_map(gm)
+    roots, _subgraph_nodes = _collect_required_inputs(gm, target_name, allowed_roots)
     recompute_subgraph = _extract_graph_with_inputs_outputs(
         joint_graph=gm.graph,
-        inputs=nodes_required_to_recompute,
-        outputs=node_to_recompute,
+        inputs=roots,
+        outputs=[name_to_node[target_name]],
     )
-    print("Extracted recomputation sub-graph: ")
-    recompute_subgraph.print_tabular()
+    return recompute_subgraph, roots
 
-    # Insert the nodes of the new sub-graph in the old graph before the first
-    # backward access of the node to be recomputed.
-    with gm.graph.inserting_before(first_back_access):
-        for n in recompute_subgraph.nodes:
-            if n.op == "placeholder" or n.op == "output":
-                continue
-            # Copy the nodes of the new sub-graph to old graph and transform its
-            # inputs to match the old-graph inputs. The arg_transform function
-            # will pass the input arguments of the new node and will expect a
-            # mapping to the nodes of the old graph.
-            new_node = gm.graph.node_copy(
-                n, arg_transform=lambda arg: name_to_node[arg.name]
-            )
 
-            if n.name in node_to_recompute_names:
-                old_node = name_to_node[n.name]
-                # Replace all the uses of the old node with new recomputation node
-                replace_subsequent_uses_of(
-                    gm.graph, old_node=old_node, new_node=new_node
+def _eligible_activation(
+    activation: ActivationInfo, config: ActivationCheckpointConfig
+) -> bool:
+    return activation.size_bytes >= int(config.min_savings_mb * 1024 * 1024)
+
+
+def build_checkpoint_plan(
+    profiler: GraphProfiler,
+    config: Optional[ActivationCheckpointConfig] = None,
+) -> ActivationCheckpointPlan:
+    config = config or ActivationCheckpointConfig()
+    activations = sorted(
+        profiler.activations,
+        key=lambda item: (
+            0.0
+            if item.recompute_cost_ms <= 0
+            else item.size_bytes / max(item.recompute_cost_ms, 1e-6)
+        ),
+        reverse=True,
+    )
+    total_activation_bytes = sum(item.size_bytes for item in activations)
+    target_saved = (
+        max(0, total_activation_bytes - int(config.memory_budget_mb * 1024 * 1024))
+        if config.memory_budget_mb is not None
+        else total_activation_bytes
+    )
+
+    plan = ActivationCheckpointPlan()
+    accumulated_saved = 0
+    accumulated_recompute_ms = 0.0
+    total_forward_ms = sum(
+        stat.elapsed_ms_avg for stat in profiler.runtime_stats.values() if stat.phase == "forward"
+    )
+    allowed_recompute_ms = (
+        float("inf")
+        if total_forward_ms <= 0
+        else total_forward_ms * config.max_recompute_ratio
+    )
+
+    for activation in activations:
+        if config.max_candidates is not None and len(plan.recompute) >= config.max_candidates:
+            plan.skipped[activation.name] = "candidate_limit"
+            continue
+        if not _eligible_activation(activation, config):
+            plan.skipped[activation.name] = "below_min_savings"
+            continue
+        projected_cost = accumulated_recompute_ms + activation.recompute_cost_ms
+        if activation.recompute_cost_ms > 0 and projected_cost > allowed_recompute_ms:
+            plan.skipped[activation.name] = "recompute_budget"
+            continue
+
+        accumulated_saved += activation.size_bytes
+        accumulated_recompute_ms = projected_cost
+        plan.recompute.append(activation.name)
+        if config.memory_budget_mb is not None and accumulated_saved >= target_saved:
+            break
+
+    plan.retain = [
+        activation.name for activation in activations if activation.name not in set(plan.recompute)
+    ]
+    plan.estimated_saved_bytes = accumulated_saved
+    return plan
+
+
+def apply_activation_checkpointing(
+    gm: fx.GraphModule,
+    profiler: GraphProfiler,
+    plan: ActivationCheckpointPlan,
+) -> fx.GraphModule:
+    name_to_node = get_name_to_node_map(gm)
+    retained_names = set(plan.retain)
+    rewritten: Set[str] = set()
+
+    for activation in sorted(
+        (item for item in profiler.activations if item.name in plan.recompute),
+        key=lambda item: item.first_backward_use_index,
+    ):
+        if activation.name in rewritten:
+            continue
+        original_node = name_to_node[activation.name]
+        allowed_roots = retained_names | {
+            node.name for node in gm.graph.nodes if node.op == "placeholder"
+        }
+        recompute_subgraph, _roots = _extract_recompute_subgraph(
+            gm, activation.name, allowed_roots
+        )
+        insertion_point = next(
+            node for node in gm.graph.nodes if node.name == activation.first_backward_user_name
+        )
+
+        local_name_to_old: Dict[str, fx.Node] = dict(name_to_node)
+        replacement_node: Optional[fx.Node] = None
+        with gm.graph.inserting_before(insertion_point):
+            for node in recompute_subgraph.nodes:
+                if node.op in {"placeholder", "output"}:
+                    continue
+                copied = gm.graph.node_copy(
+                    node, arg_transform=lambda arg: local_name_to_old[arg.name]
                 )
-            # Add the new node to our name to node mapping
-            name_to_node[n.name] = new_node
+                local_name_to_old[node.name] = copied
+                if node.name == activation.name:
+                    replacement_node = copied
+
+        if replacement_node is None:
+            raise RuntimeError(f"Failed to create recompute node for {activation.name}.")
+        replace_subsequent_uses_of(gm.graph, original_node, replacement_node)
+        rewritten.add(activation.name)
+        retained_names.add(activation.name)
+        name_to_node = get_name_to_node_map(gm)
 
     gm.graph.lint()
     gm.recompile()
     return gm
 
 
+def activation_checkpointing(
+    gm: fx.GraphModule,
+    profiler: GraphProfiler,
+    config: Optional[ActivationCheckpointConfig] = None,
+) -> Tuple[fx.GraphModule, ActivationCheckpointPlan]:
+    gm = remove_detach_nodes(gm)
+    plan = build_checkpoint_plan(profiler, config=config)
+    rewritten = apply_activation_checkpointing(gm, profiler, plan)
+    return rewritten, plan
+
+
+def verify_graph_equivalence(
+    baseline_gm: fx.GraphModule,
+    rewritten_gm: fx.GraphModule,
+    args: Sequence[torch.Tensor],
+    atol: float = 1e-5,
+    rtol: float = 1e-4,
+) -> bool:
+    with torch.no_grad():
+        baseline_output = baseline_gm(*args)
+        rewritten_output = rewritten_gm(*args)
+
+    def flatten(value: object) -> Iterable[torch.Tensor]:
+        if isinstance(value, torch.Tensor):
+            yield value
+            return
+        if isinstance(value, (tuple, list)):
+            for item in value:
+                yield from flatten(item)
+
+    baseline_tensors = list(flatten(baseline_output))
+    rewritten_tensors = list(flatten(rewritten_output))
+    if len(baseline_tensors) != len(rewritten_tensors):
+        return False
+    return all(
+        torch.allclose(lhs, rhs, atol=atol, rtol=rtol)
+        for lhs, rhs in zip(baseline_tensors, rewritten_tensors)
+    )
+
+
+def custom_fn(w1: torch.Tensor, w2: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    z = torch.mm(w1, x)
+    z = torch.nn.functional.relu(z)
+    z = torch.mm(z, w2)
+    z = torch.nn.functional.relu(z)
+    z = z.sum()
+    z = SEPFunction.apply(z)
+    z.backward()
+    return w1.grad, w2.grad
+
+
 if __name__ == "__main__":
-    # Create two weight matrices that require gradients and one input data matrix
     w1 = torch.randn(1024, 1024, device="cuda", requires_grad=True)
     w2 = torch.randn(2048, 512, device="cuda", requires_grad=True)
     x = torch.randn(1024, 2048, device="cuda")
 
-    # Create a graph module by tracing the the custom function with the given inputs
     graph_module = make_fx(custom_fn)(w1, w2, x)
     graph_module = remove_detach_nodes(graph_module)
-    print("Original graph of custom fn (fwd+bwd): ")
-    graph_module.graph.print_tabular()
-
-    # Obtain the gradients of (w1, w2) using x as input to the traced function
-    # NOTE: We have already captured the backward operations during tracing
-    # hence we are executing in no grad mode
+    profiler = GraphProfiler(graph_module)
     with torch.no_grad():
-        old_grads = graph_module(w1, w2, x)
-
-    # Apply the activation checkpointing algorithm (check new node 'relu_2')
-    new_graph_module = activation_checkpointing(graph_module)
-    print("Modified graph of custom fn (fwd+bwd+activation_checkpointing): ")
-    new_graph_module.graph.print_tabular()
-
-    # Obtain the gradients of (w1, w2) using x as input to the activation
-    # checkpointed function to recalculate them
-    with torch.no_grad():
-        new_grads = new_graph_module(w1, w2, x)
-
-    # Verify that gradients produced with activation checkpointing equal the
-    # ones obtained earlier with no optimization.
-    print("Result verification")
-    for old_grad, new_grad in zip(old_grads, new_grads):
-        print(torch.allclose(old_grad, new_grad))
+        profiler.run(w1, w2, x)
+    profiler.aggregate_stats()
+    new_graph_module, plan = activation_checkpointing(graph_module, profiler)
+    print("Recompute plan:", plan.recompute)
+    print(
+        "Equivalent:",
+        verify_graph_equivalence(graph_module, new_graph_module, (w1, w2, x)),
+    )

@@ -1,0 +1,3 @@
+model_name,batch_size,use_activation_checkpointing,latency_ms_avg,latency_ms_std,peak_memory_bytes_avg,peak_memory_bytes_max,correctness_ok,output_dir,profiler_summary_path,plan_path,rewritten_profiler_summary_path
+BERT,1,False,61.01049995049834,7.022188186645508,1774616064.0,1774616064.0,,outputs\bench_smoke\BERT\bs_1\baseline,outputs\bench_smoke\BERT\bs_1\baseline\profiler_summary.json,,
+BERT,1,True,52.72936665763458,3.5304720401763916,1775038976.0,1775038976.0,True,outputs\bench_smoke\BERT\bs_1\ac,outputs\bench_smoke\BERT\bs_1\ac\profiler_summary.json,outputs\bench_smoke\BERT\bs_1\ac\checkpoint_plan.json,

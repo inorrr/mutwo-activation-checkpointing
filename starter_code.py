@@ -1,18 +1,16 @@
+import argparse
 import logging
-import os
-from functools import wraps
+from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import torch
 import torch.fx as fx
-import torch.multiprocessing as mp
 import torch.nn as nn
 
+from activation_checkpoint import ActivationCheckpointConfig, activation_checkpointing
 from graph_prof import GraphProfiler
 from graph_tracer import SEPFunction, compile
-
-# This is the dummy model that is for use in starter code. But we will
-# experiment with Resnet and Transformer model.
 
 
 class DummyModel(nn.Module):
@@ -27,101 +25,92 @@ class DummyModel(nn.Module):
         return self.mod(x)
 
 
-# We wrap the loss with a separator function to call a
-# dummy function 'SEPFunction', which is the separator function, that will call
-# an identity operator at the end of the forward pass. This identity operator
-# will get recorded in the computational graph and will inform you where the
-# backward pass ends.
-
-
-# This is the train_step function that takes in a model, optimizer and an input
-# mini batch and calls the forward pass, loss function and the optimizer step. A
-# computational graph corresponding to a train_step will be captured by the
-# compiler.
-
-
 def train_step(
     model: torch.nn.Module, optim: torch.optim.Optimizer, batch: torch.Tensor
-):
-    loss =  model(batch).sum()
+) -> None:
+    loss = model(batch).sum()
     loss = SEPFunction.apply(loss)
     loss.backward()
     optim.step()
     optim.zero_grad()
 
 
-# Below is a user defined function that accepts a graph module and arguments of
-# used to run the graph. You can essentially do any operation, graph
-# modification, profiling etc. inside this function. Subsequent to modifications
-# or graph analysis, the function expects you to return the modified graph back.
-# In the given example, we just print the graph, and then initilize the graph
-# profiler. The graph profiler extends the class fx.Interpreter, that allows you
-# to run the graph node by node, more explanation in graph_prof.py.
+def graph_transformation_factory(
+    output_dir: Path,
+    use_activation_checkpointing: bool,
+    checkpoint_config: ActivationCheckpointConfig,
+):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def transform(gm: fx.GraphModule, args: Any) -> fx.GraphModule:
+        profiler = GraphProfiler(gm)
+        with torch.no_grad():
+            for _ in range(2):
+                profiler.run(*args)
+        profiler.aggregate_stats()
+        profiler.export_summary(output_dir / "profiler_summary.json")
+        profiler.print_stats(limit=10)
+        gm._ac_run_with_interpreter = True
+
+        if not use_activation_checkpointing:
+            return gm
+
+        rewritten_gm, plan = activation_checkpointing(gm, profiler, checkpoint_config)
+        (output_dir / "checkpoint_plan.json").write_text(
+            str(asdict(plan)), encoding="utf-8"
+        )
+        rewritten_gm._ac_run_with_interpreter = True
+        return rewritten_gm
+
+    return transform
 
 
-def graph_transformation(gm: fx.GraphModule, args: Any) -> fx.GraphModule:
-    print(gm.graph)
-    graph_profiler = GraphProfiler(gm)
-    warm_up_iters, profile_iters = 2, 3
-    with torch.no_grad():
-        for _ in range(warm_up_iters):
-            graph_profiler.run(*args)
-        graph_profiler.reset_stats()
-        for _ in range(profile_iters):
-            graph_profiler.run(*args)
-    graph_profiler.aggregate_stats()
-    graph_profiler.print_stats()
-    return gm
-
-
-# We first initialize the model, pass it to the wrapper model, then create a
-# random input mini-batch and initilize the optimizer. We then call the compile
-# function that takes in two arguments, a train_step function and a
-# graph_transformation function. The train_step function is the one that will be
-# traced by the compiler and a computational graph for the same will be created.
-# This computational graph is then passed to the graph_transformation function
-# to do any graph profiling, modifications and optimizations. This modified
-# graph is stored and will be returned as the compiled function. In essence we
-# do the following inside the compile function:
-
-# def compile (train_step, graph_transformation):
-#     @wraps(train_step)
-#     def inner(*args, **kwargs):
-#         if not_compiled:
-#             original_graph, input_args = graph_tracer(train_step)
-#             modified_graph = graph_transformation(original_graph, input_args)
-#         output = modified_graph(*args, **kwargs)
-#         return output
-#     return inner
-
-
-def experiment():
-    logging.getLogger().setLevel(logging.DEBUG)
+def experiment(
+    use_activation_checkpointing: bool,
+    output_dir: Path,
+    memory_budget_mb: float | None = None,
+):
+    logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(20)
     batch_size = 1000
     layers = 10
     dim = 100
-    num_iters = 5
 
-    device_str = 'cuda:0'
-    model = DummyModel(dim=dim, layers=layers).to(device_str)
-    batch = torch.randn(batch_size, dim).to(device_str)
-    optim = torch.optim.Adam(
-        model.parameters(), lr=0.01,
-        foreach=True,  # fused=True,
-        capturable=True
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = DummyModel(dim=dim, layers=layers).to(device)
+    batch = torch.randn(batch_size, dim, device=device)
+    optimizer_kwargs = {"capturable": True} if device.type == "cuda" else {}
+    optim = torch.optim.Adam(model.parameters(), lr=0.01, foreach=True, **optimizer_kwargs)
 
     for param in model.parameters():
         if param.requires_grad:
-            param.grad = torch.rand_like(param, device=device_str)
-
+            param.grad = torch.rand_like(param, device=device)
     optim.step()
     optim.zero_grad()
 
-    compiled_fn = compile(train_step, graph_transformation)
+    compiled_fn = compile(
+        train_step,
+        graph_transformation_factory(
+            output_dir=output_dir,
+            use_activation_checkpointing=use_activation_checkpointing,
+            checkpoint_config=ActivationCheckpointConfig(memory_budget_mb=memory_budget_mb),
+        ),
+    )
     compiled_fn(model, optim, batch)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the starter activation-checkpointing example.")
+    parser.add_argument("--use-ac", action="store_true", help="Enable activation checkpointing.")
+    parser.add_argument("--output-dir", default="outputs/starter")
+    parser.add_argument("--memory-budget-mb", type=float, default=None)
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    experiment()
+    args = parse_args()
+    experiment(
+        use_activation_checkpointing=args.use_ac,
+        output_dir=Path(args.output_dir),
+        memory_budget_mb=args.memory_budget_mb,
+    )

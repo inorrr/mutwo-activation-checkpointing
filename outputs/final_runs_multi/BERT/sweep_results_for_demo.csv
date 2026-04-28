@@ -1,0 +1,7 @@
+model_name,batch_size,use_activation_checkpointing,latency_ms_avg,latency_ms_std,peak_memory_bytes_avg,peak_memory_bytes_max,correctness_ok,output_dir,profiler_summary_path,plan_path,rewritten_profiler_summary_path
+BERT,1,False,81.8296333309263,1.15680730342865,1774616064.0,1774616064.0,,outputs\final_runs_multi\BERT\bs_1\baseline,outputs\final_runs_multi\BERT\bs_1\baseline\profiler_summary.json,,
+BERT,1,True,128.8373334488521,26.046091079711914,1775038976.0,1775038976.0,True,outputs\final_runs_multi\BERT\bs_1\ac,outputs\final_runs_multi\BERT\bs_1\ac\profiler_summary.json,outputs\final_runs_multi\BERT\bs_1\ac\checkpoint_plan.json,
+BERT,2,False,94.50073330663145,1.5895744562149048,1847492096.0,1847492096.0,,outputs\final_runs_multi\BERT\bs_2\baseline,outputs\final_runs_multi\BERT\bs_2\baseline\profiler_summary.json,,
+BERT,2,True,126.39809997441868,11.124896049499512,1848016384.0,1848016384.0,True,outputs\final_runs_multi\BERT\bs_2\ac,outputs\final_runs_multi\BERT\bs_2\ac\profiler_summary.json,outputs\final_runs_multi\BERT\bs_2\ac\checkpoint_plan.json,
+BERT,4,False,98.99089997634292,15.117903709411621,1991557632.0,1991557632.0,,outputs\final_runs_multi\BERT\bs_4\baseline,outputs\final_runs_multi\BERT\bs_4\baseline\profiler_summary.json,,
+BERT,4,True,91.56040001350145,9.640050888061523,1991438848.0,1991438848.0,True,outputs\final_runs_multi\BERT\bs_4\ac,outputs\final_runs_multi\BERT\bs_4\ac\profiler_summary.json,outputs\final_runs_multi\BERT\bs_4\ac\checkpoint_plan.json,

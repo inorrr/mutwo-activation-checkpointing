@@ -1,0 +1,5 @@
+model_name,batch_size,use_activation_checkpointing,latency_ms_avg,latency_ms_std,peak_memory_bytes_avg,peak_memory_bytes_max,correctness_ok,output_dir,profiler_summary_path,plan_path,rewritten_profiler_summary_path
+ResNet-152,1,False,389.4319001119584,37.5828742980957,3672270848.0,3672270848.0,,outputs\final_runs_multi\ResNet-152\bs_1\baseline,outputs\final_runs_multi\ResNet-152\bs_1\baseline\profiler_summary.json,,
+ResNet-152,1,True,365.1033000399669,7.414719104766846,3677559808.0,3677559808.0,True,outputs\final_runs_multi\ResNet-152\bs_1\ac,outputs\final_runs_multi\ResNet-152\bs_1\ac\profiler_summary.json,outputs\final_runs_multi\ResNet-152\bs_1\ac\checkpoint_plan.json,
+ResNet-152,2,False,354.6393333623807,12.88452434539795,4209669120.0,4209669120.0,,outputs\final_runs_multi\ResNet-152\bs_2\baseline,outputs\final_runs_multi\ResNet-152\bs_2\baseline\profiler_summary.json,,
+ResNet-152,2,True,321.12230011262,6.063553810119629,4208915456.0,4208915456.0,True,outputs\final_runs_multi\ResNet-152\bs_2\ac,outputs\final_runs_multi\ResNet-152\bs_2\ac\profiler_summary.json,outputs\final_runs_multi\ResNet-152\bs_2\ac\checkpoint_plan.json,

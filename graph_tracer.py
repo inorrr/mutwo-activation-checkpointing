@@ -183,6 +183,15 @@ class _CompiledResult:
     flat_state: List[torch.Tensor]
 
 
+@dataclass
+class PlaceholderMetadata:
+    name: str
+    role: str
+    shape: Optional[torch.Size]
+    dtype: Optional[torch.dtype]
+    requires_grad: bool = False
+
+
 def _compile(func: Callable, *args: Any, **kwargs: Any):
     # 1. Extract nn.Module and Optimizer from args and kwargs
     mod, opt = None, None
@@ -258,6 +267,28 @@ def _compile(func: Callable, *args: Any, **kwargs: Any):
 
     flat_state, _ = pytree.tree_flatten([params_and_buffers, named_states])
 
+    placeholder_metadata: List[PlaceholderMetadata] = []
+    placeholder_metadata.extend(
+        PlaceholderMetadata(
+            name=name,
+            role="parameter" if isinstance(tensor, nn.Parameter) else "buffer",
+            shape=getattr(tensor, "shape", None),
+            dtype=getattr(tensor, "dtype", None),
+            requires_grad=bool(getattr(tensor, "requires_grad", False)),
+        )
+        for name, tensor in params_and_buffers.items()
+    )
+    placeholder_metadata.extend(
+        PlaceholderMetadata(
+            name=name,
+            role="optimizer_state",
+            shape=getattr(state, "shape", None),
+            dtype=getattr(state, "dtype", None),
+            requires_grad=bool(getattr(state, "requires_grad", False)),
+        )
+        for name, state in named_states.items()
+    )
+
     for node in gm.graph.nodes:
         if node.target == torch.ops.aten.detach.default:
             input_node = node.all_input_nodes[0]
@@ -271,6 +302,10 @@ def _compile(func: Callable, *args: Any, **kwargs: Any):
                 gm.graph.erase_node(node)
 
     gm = _to_caller_flattened_graph_module(gm)
+    gm._ac_placeholder_metadata = placeholder_metadata
+    gm._ac_num_flat_state = len(flat_state)
+    gm._ac_param_buffer_count = len(params_and_buffers)
+    gm._ac_optimizer_state_count = len(named_states)
 
     return _CompiledResult(gm, mod, opt, flat_state)
 
@@ -293,7 +328,11 @@ def compile(func: Callable, gm_transformation: Callable):
         if first_iter and gm_transformation:
             compiled_obj.gm = gm_transformation(compiled_obj.gm, flat_inps)
         with torch.no_grad():
-            output = compiled_obj.gm(*flat_inps)[0]
+            if getattr(compiled_obj.gm, "_ac_run_with_interpreter", False):
+                interpreter = fx.Interpreter(compiled_obj.gm, garbage_collect_values=True)
+                output = interpreter.run(*flat_inps)[0]
+            else:
+                output = compiled_obj.gm(*flat_inps)[0]
 
         return output
 
