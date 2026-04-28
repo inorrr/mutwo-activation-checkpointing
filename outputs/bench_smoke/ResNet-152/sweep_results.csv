@@ -1,3 +1,0 @@
-model_name,batch_size,use_activation_checkpointing,latency_ms_avg,latency_ms_std,peak_memory_bytes_avg,peak_memory_bytes_max,correctness_ok,output_dir,profiler_summary_path,plan_path,rewritten_profiler_summary_path
-ResNet-152,1,False,200.36233325178424,13.693570137023926,3672270848.0,3672270848.0,,outputs\bench_smoke\ResNet-152\bs_1\baseline,outputs\bench_smoke\ResNet-152\bs_1\baseline\profiler_summary.json,,
-ResNet-152,1,True,186.4632999834915,2.6043286323547363,3677559808.0,3677559808.0,True,outputs\bench_smoke\ResNet-152\bs_1\ac,outputs\bench_smoke\ResNet-152\bs_1\ac\profiler_summary.json,outputs\bench_smoke\ResNet-152\bs_1\ac\checkpoint_plan.json,
