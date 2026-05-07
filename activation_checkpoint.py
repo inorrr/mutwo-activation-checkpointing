@@ -29,6 +29,16 @@ class ActivationCheckpointPlan:
     retain: List[str] = field(default_factory=list)
     skipped: Dict[str, str] = field(default_factory=dict)
     estimated_saved_bytes: int = 0
+    estimated_peak_bytes: int = 0
+    metadata: Dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _MutwoRecomputeCandidate:
+    activation: ActivationInfo
+    inactive_time_ms: float
+    recompute_ratio: float
+    recompute_overhead_ms: float
 
 
 def replace_subsequent_uses_of(
@@ -151,7 +161,106 @@ def _activation_overlaps_peak(profiler: GraphProfiler, activation: ActivationInf
     peak_index = max(summary.timeline_breakdown, key=lambda item: item["activation_bytes"])[
         "index"
     ]
-    return activation.create_index <= peak_index <= activation.last_forward_use_index
+    return activation.create_index <= peak_index <= activation.first_backward_use_index
+
+
+def _activation_inactive_time_ms(
+    profiler: GraphProfiler, activation: ActivationInfo
+) -> float:
+    nodes = getattr(profiler, "nodes", [])
+    node_to_index = getattr(profiler, "node_to_index", {})
+    elapsed = 0.0
+    for node in nodes:
+        idx = node_to_index.get(node)
+        if idx is None:
+            continue
+        if activation.last_forward_use_index < idx < activation.first_backward_use_index:
+            stat = profiler.runtime_stats.get(node.name)
+            if stat is not None:
+                elapsed += stat.elapsed_ms_avg
+    if elapsed > 0:
+        return elapsed
+    return float(max(0, activation.first_backward_use_index - activation.last_forward_use_index))
+
+
+def _build_mutwo_candidates(
+    profiler: GraphProfiler,
+    config: ActivationCheckpointConfig,
+) -> Tuple[List[_MutwoRecomputeCandidate], Dict[str, str]]:
+    candidates: List[_MutwoRecomputeCandidate] = []
+    skipped: Dict[str, str] = {}
+    for activation in profiler.activations:
+        if not _eligible_activation(activation, config):
+            skipped[activation.name] = "below_min_savings"
+            continue
+        if config.exclude_view_like_ops and _is_view_like_activation(activation):
+            skipped[activation.name] = "view_like_or_alias"
+            continue
+
+        recompute_overhead = max(activation.recompute_cost_ms, 0.0)
+        recompute_ratio = (
+            float("inf")
+            if recompute_overhead <= 0
+            else activation.size_bytes / max(recompute_overhead, 1e-6)
+        )
+        candidates.append(
+            _MutwoRecomputeCandidate(
+                activation=activation,
+                inactive_time_ms=_activation_inactive_time_ms(profiler, activation),
+                recompute_ratio=recompute_ratio,
+                recompute_overhead_ms=recompute_overhead,
+            )
+        )
+    return candidates, skipped
+
+
+def _simulated_activation_peak_bytes(
+    profiler: GraphProfiler,
+    recomputed_names: Set[str],
+) -> int:
+    peak = 0
+    nodes = getattr(profiler, "nodes", [])
+    if nodes:
+        indices = range(len(nodes))
+    else:
+        summary = profiler.latest_summary or profiler.build_summary()
+        indices = (item["index"] for item in summary.timeline_breakdown)
+    for idx in indices:
+        live_bytes = 0
+        for activation in profiler.activations:
+            last_live_index = (
+                activation.last_forward_use_index
+                if activation.name in recomputed_names
+                else activation.first_backward_use_index
+            )
+            if activation.create_index <= idx <= last_live_index:
+                live_bytes += activation.size_bytes
+        peak = max(peak, live_bytes)
+    return peak
+
+
+def _simulated_total_peak_bytes(
+    profiler: GraphProfiler,
+    recomputed_names: Set[str],
+) -> int:
+    summary = profiler.latest_summary or profiler.build_summary()
+    non_activation_bytes = (
+        summary.parameter_bytes + summary.gradient_bytes + summary.optimizer_state_bytes
+    )
+    return non_activation_bytes + _simulated_activation_peak_bytes(
+        profiler, recomputed_names
+    )
+
+
+def _mutwo_recompute_sort_key(
+    candidate: _MutwoRecomputeCandidate,
+) -> Tuple[float, float, int, int]:
+    return (
+        candidate.recompute_ratio,
+        candidate.inactive_time_ms,
+        candidate.activation.size_bytes,
+        -candidate.activation.create_index,
+    )
 
 
 def build_checkpoint_plan(
@@ -159,36 +268,44 @@ def build_checkpoint_plan(
     config: Optional[ActivationCheckpointConfig] = None,
 ) -> ActivationCheckpointPlan:
     config = config or ActivationCheckpointConfig()
-    peak_overlaps = {
-        activation.name: _activation_overlaps_peak(profiler, activation)
-        for activation in profiler.activations
-    }
-    has_peak_eligible_activation = any(
-        _eligible_activation(activation, config)
-        and not (
-            config.exclude_view_like_ops and _is_view_like_activation(activation)
-        )
-        and peak_overlaps[activation.name]
-        for activation in profiler.activations
+    summary = profiler.latest_summary or profiler.build_summary()
+    memory_limit_bytes = (
+        int(config.memory_budget_mb * 1024 * 1024)
+        if config.memory_budget_mb is not None
+        else None
     )
-    activations = sorted(
-        profiler.activations,
-        key=lambda item: (
-            1 if peak_overlaps[item.name] else 0,
-            0.0
-            if item.recompute_cost_ms <= 0
-            else item.size_bytes / max(item.recompute_cost_ms, 1e-6)
-        ),
+    candidates, initial_skipped = _build_mutwo_candidates(profiler, config)
+    plan = ActivationCheckpointPlan()
+    plan.skipped.update(initial_skipped)
+    current_peak_bytes = summary.total_peak_bytes
+    plan.estimated_peak_bytes = current_peak_bytes
+
+    peak_overlaps = {
+        candidate.activation.name: _activation_overlaps_peak(
+            profiler, candidate.activation
+        )
+        for candidate in candidates
+    }
+    peak_candidates = [
+        candidate
+        for candidate in candidates
+        if not config.prefer_peak_overlap or peak_overlaps[candidate.activation.name]
+    ]
+    if peak_candidates:
+        for candidate in candidates:
+            if candidate not in peak_candidates:
+                plan.skipped[candidate.activation.name] = "outside_peak_live_set"
+        candidates = peak_candidates
+    elif config.prefer_peak_overlap:
+        for candidate in candidates:
+            plan.skipped[candidate.activation.name] = "outside_peak_live_set"
+        candidates = []
+
+    remaining = sorted(
+        candidates,
+        key=_mutwo_recompute_sort_key,
         reverse=True,
     )
-    total_activation_bytes = sum(item.size_bytes for item in activations)
-    target_saved = (
-        max(0, total_activation_bytes - int(config.memory_budget_mb * 1024 * 1024))
-        if config.memory_budget_mb is not None
-        else total_activation_bytes
-    )
-
-    plan = ActivationCheckpointPlan()
     accumulated_saved = 0
     accumulated_recompute_ms = 0.0
     total_forward_ms = sum(
@@ -203,38 +320,66 @@ def build_checkpoint_plan(
         )
     )
 
-    for activation in activations:
-        if not _eligible_activation(activation, config):
-            plan.skipped[activation.name] = "below_min_savings"
-            continue
-        if config.exclude_view_like_ops and _is_view_like_activation(activation):
-            plan.skipped[activation.name] = "view_like_or_alias"
-            continue
-        if (
-            config.prefer_peak_overlap
-            and has_peak_eligible_activation
-            and not peak_overlaps[activation.name]
-        ):
-            plan.skipped[activation.name] = "outside_peak_live_set"
-            continue
+    while remaining:
+        if memory_limit_bytes is not None and current_peak_bytes <= memory_limit_bytes:
+            break
         if config.max_candidates is not None and len(plan.recompute) >= config.max_candidates:
-            plan.skipped[activation.name] = "candidate_limit"
-            continue
-        projected_cost = accumulated_recompute_ms + activation.recompute_cost_ms
-        if activation.recompute_cost_ms > 0 and projected_cost > allowed_recompute_ms:
-            plan.skipped[activation.name] = "recompute_budget"
-            continue
+            for candidate in remaining:
+                plan.skipped[candidate.activation.name] = "candidate_limit"
+            break
 
+        selected_candidate: Optional[_MutwoRecomputeCandidate] = None
+        selected_peak = current_peak_bytes
+        selected_cost = accumulated_recompute_ms
+        for candidate in remaining:
+            activation = candidate.activation
+            projected_cost = accumulated_recompute_ms + candidate.recompute_overhead_ms
+            if candidate.recompute_overhead_ms > 0 and projected_cost > allowed_recompute_ms:
+                plan.skipped[activation.name] = "recompute_budget"
+                continue
+
+            projected_recompute = set(plan.recompute) | {activation.name}
+            projected_peak = _simulated_total_peak_bytes(profiler, projected_recompute)
+            if projected_peak >= current_peak_bytes and memory_limit_bytes is not None:
+                plan.skipped[activation.name] = "no_peak_reduction"
+                continue
+            selected_candidate = candidate
+            selected_peak = projected_peak
+            selected_cost = projected_cost
+            break
+
+        if selected_candidate is None:
+            break
+
+        activation = selected_candidate.activation
         accumulated_saved += activation.size_bytes
-        accumulated_recompute_ms = projected_cost
+        accumulated_recompute_ms = selected_cost
+        plan.skipped.pop(activation.name, None)
         plan.recompute.append(activation.name)
-        if config.memory_budget_mb is not None and accumulated_saved >= target_saved:
+        current_peak_bytes = selected_peak
+        plan.estimated_peak_bytes = current_peak_bytes
+        remaining = [
+            candidate
+            for candidate in remaining
+            if candidate.activation.name != activation.name
+        ]
+
+        if memory_limit_bytes is None and config.max_candidates is None:
             break
 
     plan.retain = [
-        activation.name for activation in activations if activation.name not in set(plan.recompute)
+        activation.name
+        for activation in profiler.activations
+        if activation.name not in set(plan.recompute)
     ]
     plan.estimated_saved_bytes = accumulated_saved
+    plan.metadata = {
+        "algorithm": "mutwo_simplified_recompute_only",
+        "initial_peak_bytes": summary.total_peak_bytes,
+        "memory_limit_bytes": memory_limit_bytes,
+        "allowed_recompute_ms": allowed_recompute_ms,
+        "estimated_recompute_ms": accumulated_recompute_ms,
+    }
     return plan
 
 

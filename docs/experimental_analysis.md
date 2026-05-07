@@ -23,7 +23,15 @@ The final implementation uses:
 - CUDA cache/peak-stat cleanup before measurement.
 - A profiler cleanup fix so `GraphProfiler` does not retain runtime tensors after profiling.
 
-The custom checkpoint planner was also updated to avoid spending checkpoint slots on view-like or alias-like candidates such as `t`, `view`, `transpose`, `expand`, and `getitem`. Those tensors can appear large from shape alone, but often do not own new CUDA storage, so recomputing them rarely reduces allocator peak memory.
+The custom checkpoint planner now uses a simplified, recompute-only version of the Mutwo policy from the MLSys 2023 paper. The full Mutwo system combines multi-model scheduling, activation swapping, and activation recomputation. This project only rewrites recomputation candidates, so the implemented subset does the following:
+
+- Builds recomputation candidates from profiled activation size, lifetime, and estimated recompute cost.
+- Models the inactive interval between an activation's last forward use and its first backward use.
+- Scores recomputation candidates by memory saved per recompute cost, with inactive time and size as tie breakers.
+- Prioritizes activations that overlap the modeled peak live set.
+- Iteratively simulates total peak memory after each recompute decision and stops when the configured memory budget, candidate limit, or recompute-cost limit is reached.
+
+This replaces the earlier simple heuristic that sorted individual activations by peak overlap and size-per-cost without validating each choice against a simulated memory timeline. The planner also avoids spending checkpoint slots on view-like or alias-like candidates such as `t`, `view`, `transpose`, `expand`, and `getitem`. Those tensors can appear large from shape alone, but often do not own new CUDA storage, so recomputing them rarely reduces allocator peak memory.
 
 For BERT, the benchmark uses `vocab_size=4096` instead of the default `30522`. The original default vocabulary made the language-modeling head dominate memory, masking the effect of checkpointing transformer-layer activations. The reduced vocabulary keeps the BERT-style workflow intact, while `seq_len=512` makes transformer activations large enough for checkpointing to produce a clear memory reduction at larger batch sizes.
 
@@ -35,8 +43,8 @@ Runtime summary at batch size `1`:
 
 | Mode | Avg latency (ms) | Peak GPU memory (MB) | Correctness check |
 | --- | ---: | ---: | --- |
-| Baseline | 92.39 | 1205.14 | N/A |
-| With AC | 159.77 | 1191.45 | Passed |
+| Baseline | 123.19 | 1205.14 | N/A |
+| With AC | 169.10 | 1191.45 | Passed |
 
 Static memory breakdown from the batch-size-1 baseline profiler summary:
 
@@ -45,19 +53,21 @@ Static memory breakdown from the batch-size-1 baseline profiler summary:
 | Parameters | 229.62 |
 | Gradients | 229.62 |
 | Optimizer state | 0.00 |
-| Activations | 14.06 |
-| Total traced peak | 473.30 |
+| Activations | 352.54 |
+| Total traced peak | 811.78 |
 
 Static-analysis summary:
 
 - Activation candidates identified: `778`
 - The largest apparent candidate was `t` with shape `[2048, 1000]` and size `7.81 MB`
 - The largest materialized feature-map candidates include tensors with shape `[1, 256, 80, 80]` and size `6.25 MB`
-- The AC policy selected `3` activations for recomputation in the batch-size-1 saved plan:
+- The simplified Mutwo recompute policy selected `4` activations for recomputation in the batch-size-1 saved plan:
+  - `convolution_10`
   - `convolution_7`
-  - `relu__5`
-  - `relu__3`
-- Estimated saved activation bytes from the batch-size-1 plan: approximately `14.06 MB`
+  - `convolution_3`
+  - `relu_`
+- Estimated saved activation bytes from the batch-size-1 plan: approximately `25.00 MB`
+- Estimated static traced peak after the recompute plan: approximately `786.78 MB`
 
 Largest baseline activation candidates:
 
@@ -79,8 +89,8 @@ Runtime summary at batch size `1`:
 
 | Mode | Avg latency (ms) | Peak GPU memory (MB) | Correctness check |
 | --- | ---: | ---: | --- |
-| Baseline | 100.54 | 1735.04 | N/A |
-| With AC | 117.83 | 1730.79 | Passed |
+| Baseline | 93.00 | 1735.04 | N/A |
+| With AC | 117.25 | 1730.79 | Passed |
 
 Static memory breakdown from the batch-size-1 baseline profiler summary:
 
@@ -89,16 +99,17 @@ Static memory breakdown from the batch-size-1 baseline profiler summary:
 | Parameters | 352.26 |
 | Gradients | 352.26 |
 | Optimizer state | 0.00 |
-| Activations | 16.50 |
-| Total traced peak | 721.02 |
+| Activations | 849.52 |
+| Total traced peak | 1554.04 |
 
 Static-analysis summary:
 
 - Activation candidates identified: `366`
 - The largest apparent candidates are expanded attention masks with shape `[1, 12, 512, 512]` and size `12.00 MB`
 - Several projection matrices with shapes `[768, 4096]`, `[768, 3072]`, and `[3072, 768]` also appear as large recomputable candidates
-- The batch-size-1 plan selected `gelu_12`, `add_1`, `_log_softmax`, and `add_6` for recomputation
+- The batch-size-1 plan selected `gelu_12`, `_log_softmax`, `add_1`, and `add_14` for recomputation
 - Estimated saved activation bytes from the batch-size-1 plan: approximately `12.50 MB`
+- Estimated static traced peak after the recompute plan: approximately `1549.54 MB`
 
 Largest baseline activation candidates:
 
@@ -131,6 +142,10 @@ ResNet-152 sweep bar graph:
 BERT sweep bar graph:
 
 ![BERT peak memory vs batch size](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/BERT/peak_memory_vs_batch_size.png)
+
+The peak-memory plots were also regenerated directly from the latest saved CSV files:
+
+![Combined peak memory vs batch size from CSV](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/peak_memory_vs_batch_size_combined_from_csv.png)
 
 Observed values from the current saved multi-batch runs:
 
@@ -167,22 +182,22 @@ Observed values from the current saved multi-batch runs:
 
 | Model | Batch size | Baseline latency (ms) | AC latency (ms) |
 | --- | ---: | ---: | ---: |
-| ResNet-152 | 1 | 92.39 | 159.77 |
-| ResNet-152 | 2 | 111.85 | 171.07 |
-| ResNet-152 | 4 | 151.10 | 248.36 |
-| ResNet-152 | 6 | 213.31 | 257.04 |
-| ResNet-152 | 8 | 912.71 | 1125.88 |
-| BERT | 1 | 100.54 | 117.83 |
-| BERT | 2 | 142.33 | 184.95 |
-| BERT | 4 | 266.61 | 336.78 |
-| BERT | 6 | 384.60 | 483.71 |
-| BERT | 8 | 1384.19 | 646.27 |
+| ResNet-152 | 1 | 123.19 | 169.10 |
+| ResNet-152 | 2 | 128.12 | 134.69 |
+| ResNet-152 | 4 | 180.03 | 182.38 |
+| ResNet-152 | 6 | 215.85 | 252.19 |
+| ResNet-152 | 8 | 927.33 | 312.69 |
+| BERT | 1 | 93.00 | 117.25 |
+| BERT | 2 | 149.69 | 188.86 |
+| BERT | 4 | 265.95 | 334.21 |
+| BERT | 6 | 381.91 | 482.70 |
+| BERT | 8 | 628.60 | 633.96 |
 
 Interpretation:
 
 - Activation checkpointing trades compute for memory by recomputing selected activations during backward.
-- ResNet pays a visible latency cost from recomputation, especially at small and medium batch sizes.
-- BERT generally pays recomputation overhead, but the batch-size-8 baseline run is unusually slow and noisy, likely because it is near a much higher-memory regime; this makes the AC run faster despite doing recomputation.
+- ResNet generally pays a visible latency cost from recomputation, though the latest batch-size-8 AC run is faster than the corresponding baseline measurement. That point should be treated as noisy because the baseline latency is much larger than the surrounding trend.
+- BERT pays recomputation overhead at every measured batch size in the latest run, with the batch-size-8 AC latency nearly matching baseline while cutting peak memory by about half.
 - Longer runs with more iterations would give smoother latency estimates, but the current plots are sufficient to show the memory-performance tradeoff.
 
 ## Reproduction
@@ -192,6 +207,7 @@ The current plots and summaries were generated from:
 ```powershell
 conda run -n cs265 python benchmarks.py --model "ResNet-152" --batch-sizes 1 2 4 6 8 --image-size 320 --output-dir outputs/final_runs_multi
 conda run -n cs265 python benchmarks.py --model "BERT" --batch-sizes 1 2 4 6 8 --seq-len 512 --vocab-size 4096 --output-dir outputs/final_runs_multi
+conda run -n cs265 python plot_previous_peak_memory.py
 ```
 
 The validation tests were run with:
