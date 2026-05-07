@@ -81,7 +81,7 @@ Largest baseline activation candidates:
 
 Peak-memory breakdown plot:
 
-![ResNet-152 baseline peak memory breakdown](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/ResNet-152/bs_1/baseline/peak_memory_breakdown.png)
+![ResNet-152 baseline peak memory breakdown](../outputs/final_runs_multi/ResNet-152/bs_1/baseline/peak_memory_breakdown.png)
 
 ### BERT
 
@@ -123,7 +123,7 @@ Largest baseline activation candidates:
 
 Peak-memory breakdown plot:
 
-![BERT baseline peak memory breakdown](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/BERT/bs_1/baseline/peak_memory_breakdown.png)
+![BERT baseline peak memory breakdown](../outputs/final_runs_multi/BERT/bs_1/baseline/peak_memory_breakdown.png)
 
 ### Interpretation
 
@@ -137,15 +137,15 @@ Peak-memory breakdown plot:
 
 ResNet-152 sweep bar graph:
 
-![ResNet-152 peak memory vs batch size](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/ResNet-152/peak_memory_vs_batch_size.png)
+![ResNet-152 peak memory vs batch size](../outputs/final_runs_multi/ResNet-152/peak_memory_vs_batch_size.png)
 
 BERT sweep bar graph:
 
-![BERT peak memory vs batch size](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/BERT/peak_memory_vs_batch_size.png)
+![BERT peak memory vs batch size](../outputs/final_runs_multi/BERT/peak_memory_vs_batch_size.png)
 
 The peak-memory plots were also regenerated directly from the latest saved CSV files:
 
-![Combined peak memory vs batch size from CSV](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/peak_memory_vs_batch_size_combined_from_csv.png)
+![Combined peak memory vs batch size from CSV](../outputs/final_runs_multi/peak_memory_vs_batch_size_combined_from_csv.png)
 
 Observed values from the current saved multi-batch runs:
 
@@ -172,11 +172,11 @@ Interpretation:
 
 ResNet-152 latency plot:
 
-![ResNet-152 latency vs batch size](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/ResNet-152/latency_vs_batch_size.png)
+![ResNet-152 latency vs batch size](../outputs/final_runs_multi/ResNet-152/latency_vs_batch_size.png)
 
 BERT latency plot:
 
-![BERT latency vs batch size](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi/BERT/latency_vs_batch_size.png)
+![BERT latency vs batch size](../outputs/final_runs_multi/BERT/latency_vs_batch_size.png)
 
 Observed values from the current saved multi-batch runs:
 
