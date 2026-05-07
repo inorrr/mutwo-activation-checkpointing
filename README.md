@@ -1,6 +1,6 @@
 # Activation Checkpointing with PyTorch FX
 
-![Project overview](docs/project-overview.svg)
+![Project overview](docs/project_overview.png)
 
 This repository presents an activation checkpointing prototype built with PyTorch FX tracing. It extends the [Harvard CS265](http://daslab.seas.harvard.edu/classes/cs265/) starter scaffold into a complete workflow for graph capture, profiling, checkpoint planning, benchmarking, and interactive visualization.
 
