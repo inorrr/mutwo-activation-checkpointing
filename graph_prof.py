@@ -451,7 +451,7 @@ class GraphProfiler(fx.Interpreter):
         for idx, _node in enumerate(self.nodes):
             activation_live = 0
             for activation in self.activations:
-                if activation.create_index <= idx <= activation.last_forward_use_index:
+                if activation.create_index <= idx <= activation.first_backward_use_index:
                     activation_live += activation.size_bytes
             total = (
                 self.parameter_bytes
