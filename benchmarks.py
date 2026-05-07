@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import gc
 import json
 import time
 from dataclasses import asdict, dataclass, field
@@ -17,6 +18,7 @@ import torch.fx as fx
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.checkpoint import checkpoint
 from torchvision.models import resnet152
 from transformers import BertConfig, BertForMaskedLM
 
@@ -89,6 +91,7 @@ class Experiment:
         output_root: Path = DEFAULT_OUTPUT_DIR,
         seq_len: int = 128,
         vocab_size: int = 30_522,
+        image_size: int = 224,
         debug_bert: bool = False,
     ):
         assert model_name in self.model_names, (
@@ -99,6 +102,7 @@ class Experiment:
         self.batch_size = batch_size
         self.seq_len = seq_len
         self.vocab_size = vocab_size
+        self.image_size = image_size
         self.debug_bert = debug_bert
         self.output_root = Path(output_root)
         self.output_dir = self.output_root / model_name.replace(" ", "_") / f"bs_{batch_size}"
@@ -141,7 +145,7 @@ class Experiment:
         return BertForMaskedLM(config)
 
     def _make_resnet_batch(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        images = torch.randn(batch_size, 3, 224, 224, device=self.device)
+        images = torch.randn(batch_size, 3, self.image_size, self.image_size, device=self.device)
         targets = torch.randint(0, 1000, (batch_size,), device=self.device)
         return images, targets
 
@@ -170,6 +174,18 @@ class Experiment:
         optimizer.step()
         optimizer.zero_grad()
 
+    def _resnet_forward_checkpointed(self, model: nn.Module, images: torch.Tensor) -> torch.Tensor:
+        x = model.conv1(images)
+        x = model.bn1(x)
+        x = model.relu(x)
+        x = model.maxpool(x)
+        for stage in (model.layer1, model.layer2, model.layer3, model.layer4):
+            for block in stage:
+                x = checkpoint(block, x, use_reentrant=False, preserve_rng_state=False)
+        x = model.avgpool(x)
+        x = torch.flatten(x, 1)
+        return model.fc(x)
+
     def _bert_train_step(
         self,
         model: nn.Module,
@@ -181,6 +197,37 @@ class Experiment:
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
+
+    def _enable_runtime_checkpointing(self) -> None:
+        if self.model_name != "BERT":
+            return
+        self.model.config.use_cache = False
+        try:
+            self.model.gradient_checkpointing_enable(
+                gradient_checkpointing_kwargs={
+                    "use_reentrant": False,
+                    "preserve_rng_state": False,
+                }
+            )
+        except TypeError:
+            self.model.gradient_checkpointing_enable()
+
+    def _eager_train_step(self, use_activation_checkpointing: bool, batch: Any) -> None:
+        self.model.train()
+        self.optimizer.zero_grad(set_to_none=True)
+        if self.model_name == "ResNet-152":
+            images, targets = batch
+            logits = (
+                self._resnet_forward_checkpointed(self.model, images)
+                if use_activation_checkpointing
+                else self.model(images)
+            )
+            loss = F.cross_entropy(logits, targets)
+        else:
+            outputs = self.model(**batch)
+            loss = outputs.loss
+        loss.backward()
+        self.optimizer.step()
 
     def init_opt_states(self) -> None:
         for param in self.model.parameters():
@@ -225,6 +272,10 @@ class Experiment:
     ) -> Tuple[List[float], List[int]]:
         latencies: List[float] = []
         peaks: List[int] = []
+        gc.collect()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
         for _ in range(warmup_iterations):
             compiled_fn(self.model, self.optimizer, self._new_batch_like())
         for _ in range(iterations):
@@ -233,6 +284,40 @@ class Experiment:
                 torch.cuda.synchronize()
             start = time.perf_counter()
             compiled_fn(self.model, self.optimizer, self._new_batch_like())
+            if self.device.type == "cuda":
+                torch.cuda.synchronize()
+                peaks.append(torch.cuda.max_memory_allocated())
+            else:
+                peaks.append(0)
+            latencies.append((time.perf_counter() - start) * 1000.0)
+        return latencies, peaks
+
+    def _measure_eager_training(
+        self,
+        use_activation_checkpointing: bool,
+        iterations: int = 3,
+        warmup_iterations: int = 1,
+    ) -> Tuple[List[float], List[int]]:
+        if use_activation_checkpointing:
+            self._enable_runtime_checkpointing()
+
+        latencies: List[float] = []
+        peaks: List[int] = []
+        gc.collect()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+
+        for _ in range(warmup_iterations):
+            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
+
+        for _ in range(iterations):
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
+                torch.cuda.reset_peak_memory_stats()
+                torch.cuda.synchronize()
+            start = time.perf_counter()
+            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
             if self.device.type == "cuda":
                 torch.cuda.synchronize()
                 peaks.append(torch.cuda.max_memory_allocated())
@@ -275,7 +360,10 @@ class Experiment:
         metadata: Dict[str, Any] = {
             "device": str(self.device),
             "seq_len": self.seq_len if self.model_name == "BERT" else None,
+            "vocab_size": self.vocab_size if self.model_name == "BERT" else None,
+            "image_size": self.image_size if self.model_name == "ResNet-152" else None,
             "debug_bert": self.debug_bert,
+            "measurement_mode": "eager_runtime_checkpointing",
         }
         artifacts_dir = self.output_dir / ("ac" if use_activation_checkpointing else "baseline")
         artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -320,12 +408,20 @@ class Experiment:
             capture["correctness_ok"] = self._validate_correctness(
                 rewritten_gm, original_gm, args
             )
+            rewritten_profiler = GraphProfiler(rewritten_gm)
+            with torch.no_grad():
+                for _ in range(profiler_iters):
+                    rewritten_profiler.run(*args)
+            rewritten_profiler.aggregate_stats()
+            capture["rewritten_summary_path"] = rewritten_profiler.export_summary(
+                artifacts_dir / "rewritten_profiler_summary.json"
+            )
             rewritten_gm._ac_run_with_interpreter = True
             return rewritten_gm
 
         compiled_fn = compile(self.train_step, graph_transformation)
         compiled_fn(self.model, self.optimizer, self.example_inputs)
-        latencies, peaks = self._measure_compiled_fn(compiled_fn)
+        latencies, peaks = self._measure_eager_training(use_activation_checkpointing)
 
         return RunResult(
             model_name=self.model_name,
@@ -340,7 +436,11 @@ class Experiment:
             profiler_summary_path=str(capture["summary_path"]),
             profiler_breakdown_plot=str(capture["breakdown_path"]),
             plan_path=str(capture["plan_path"]) if "plan_path" in capture else None,
-            rewritten_profiler_summary_path=None,
+            rewritten_profiler_summary_path=(
+                str(capture["rewritten_summary_path"])
+                if "rewritten_summary_path" in capture
+                else None
+            ),
             metadata=metadata,
         )
 
@@ -373,20 +473,53 @@ def _plot_sweep(
         key=lambda item: item.batch_size,
     )
     fig, ax = plt.subplots(figsize=(7, 4))
-    if baseline:
-        ax.plot(
-            [run.batch_size for run in baseline],
-            [getattr(run, metric) / (1024**2) if "memory" in metric else getattr(run, metric) for run in baseline],
-            marker="o",
-            label="Baseline",
-        )
-    if checkpointed:
-        ax.plot(
-            [run.batch_size for run in checkpointed],
-            [getattr(run, metric) / (1024**2) if "memory" in metric else getattr(run, metric) for run in checkpointed],
-            marker="o",
-            label="Activation checkpointing",
-        )
+    if "memory" in metric:
+        batch_sizes = sorted({run.batch_size for run in baseline + checkpointed})
+        x_positions = list(range(len(batch_sizes)))
+        width = 0.36
+        baseline_by_batch = {run.batch_size: run for run in baseline}
+        checkpointed_by_batch = {run.batch_size: run for run in checkpointed}
+        if baseline:
+            ax.bar(
+                [pos - width / 2 for pos in x_positions],
+                [
+                    getattr(baseline_by_batch[batch_size], metric) / (1024**2)
+                    if batch_size in baseline_by_batch
+                    else 0
+                    for batch_size in batch_sizes
+                ],
+                width=width,
+                label="Baseline",
+            )
+        if checkpointed:
+            ax.bar(
+                [pos + width / 2 for pos in x_positions],
+                [
+                    getattr(checkpointed_by_batch[batch_size], metric) / (1024**2)
+                    if batch_size in checkpointed_by_batch
+                    else 0
+                    for batch_size in batch_sizes
+                ],
+                width=width,
+                label="Activation checkpointing",
+            )
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels([str(batch_size) for batch_size in batch_sizes])
+    else:
+        if baseline:
+            ax.plot(
+                [run.batch_size for run in baseline],
+                [getattr(run, metric) for run in baseline],
+                marker="o",
+                label="Baseline",
+            )
+        if checkpointed:
+            ax.plot(
+                [run.batch_size for run in checkpointed],
+                [getattr(run, metric) for run in checkpointed],
+                marker="o",
+                label="Activation checkpointing",
+            )
     ax.set_xlabel("Batch size")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -403,6 +536,8 @@ def run_sweep(
     output_root: Path = DEFAULT_OUTPUT_DIR,
     checkpoint_config: Optional[ActivationCheckpointConfig] = None,
     seq_len: int = 128,
+    vocab_size: int = 30_522,
+    image_size: int = 224,
     debug_bert: bool = False,
 ) -> SweepResult:
     output_dir = Path(output_root) / model_name.replace(" ", "_")
@@ -415,6 +550,8 @@ def run_sweep(
             batch_size=batch_size,
             output_root=output_root,
             seq_len=seq_len,
+            vocab_size=vocab_size,
+            image_size=image_size,
             debug_bert=debug_bert,
         ).run_once(use_activation_checkpointing=False)
         runs.append(baseline)
@@ -424,6 +561,8 @@ def run_sweep(
             batch_size=batch_size,
             output_root=output_root,
             seq_len=seq_len,
+            vocab_size=vocab_size,
+            image_size=image_size,
             debug_bert=debug_bert,
         ).run_once(
             use_activation_checkpointing=True,
@@ -492,6 +631,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-sizes", nargs="+", type=int)
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--seq-len", type=int, default=128)
+    parser.add_argument("--vocab-size", type=int, default=30_522)
+    parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--debug-bert", action="store_true")
     parser.add_argument("--memory-budget-mb", type=float, default=None)
     parser.add_argument("--min-savings-mb", type=float, default=1.0)
@@ -513,6 +654,8 @@ if __name__ == "__main__":
         output_root=Path(args.output_dir),
         checkpoint_config=config,
         seq_len=args.seq_len,
+        vocab_size=args.vocab_size,
+        image_size=args.image_size,
         debug_bert=args.debug_bert,
     )
     print(json.dumps(asdict(result), indent=2))

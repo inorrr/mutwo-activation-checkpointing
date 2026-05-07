@@ -17,7 +17,10 @@ class ActivationCheckpointConfig:
     memory_budget_mb: Optional[float] = None
     min_savings_mb: float = 1.0
     max_recompute_ratio: float = 0.35
+    min_recompute_budget_ms: float = 1.0
     max_candidates: Optional[int] = 4
+    prefer_peak_overlap: bool = True
+    exclude_view_like_ops: bool = True
 
 
 @dataclass
@@ -119,14 +122,59 @@ def _eligible_activation(
     return activation.size_bytes >= int(config.min_savings_mb * 1024 * 1024)
 
 
+_VIEW_LIKE_TARGET_MARKERS = (
+    "aten.alias.",
+    "aten.as_strided.",
+    "aten.detach.",
+    "aten.expand.",
+    "aten.permute.",
+    "aten.reshape.",
+    "aten.select.",
+    "aten.slice.",
+    "aten.squeeze.",
+    "aten.t.",
+    "aten.transpose.",
+    "aten.unsqueeze.",
+    "aten.view.",
+    "_operator.getitem",
+)
+
+
+def _is_view_like_activation(activation: ActivationInfo) -> bool:
+    return any(marker in activation.source_target for marker in _VIEW_LIKE_TARGET_MARKERS)
+
+
+def _activation_overlaps_peak(profiler: GraphProfiler, activation: ActivationInfo) -> bool:
+    summary = profiler.latest_summary or profiler.build_summary()
+    if not summary.timeline_breakdown:
+        return True
+    peak_index = max(summary.timeline_breakdown, key=lambda item: item["activation_bytes"])[
+        "index"
+    ]
+    return activation.create_index <= peak_index <= activation.last_forward_use_index
+
+
 def build_checkpoint_plan(
     profiler: GraphProfiler,
     config: Optional[ActivationCheckpointConfig] = None,
 ) -> ActivationCheckpointPlan:
     config = config or ActivationCheckpointConfig()
+    peak_overlaps = {
+        activation.name: _activation_overlaps_peak(profiler, activation)
+        for activation in profiler.activations
+    }
+    has_peak_eligible_activation = any(
+        _eligible_activation(activation, config)
+        and not (
+            config.exclude_view_like_ops and _is_view_like_activation(activation)
+        )
+        and peak_overlaps[activation.name]
+        for activation in profiler.activations
+    )
     activations = sorted(
         profiler.activations,
         key=lambda item: (
+            1 if peak_overlaps[item.name] else 0,
             0.0
             if item.recompute_cost_ms <= 0
             else item.size_bytes / max(item.recompute_cost_ms, 1e-6)
@@ -149,15 +197,28 @@ def build_checkpoint_plan(
     allowed_recompute_ms = (
         float("inf")
         if total_forward_ms <= 0
-        else total_forward_ms * config.max_recompute_ratio
+        else max(
+            total_forward_ms * config.max_recompute_ratio,
+            config.min_recompute_budget_ms,
+        )
     )
 
     for activation in activations:
-        if config.max_candidates is not None and len(plan.recompute) >= config.max_candidates:
-            plan.skipped[activation.name] = "candidate_limit"
-            continue
         if not _eligible_activation(activation, config):
             plan.skipped[activation.name] = "below_min_savings"
+            continue
+        if config.exclude_view_like_ops and _is_view_like_activation(activation):
+            plan.skipped[activation.name] = "view_like_or_alias"
+            continue
+        if (
+            config.prefer_peak_overlap
+            and has_peak_eligible_activation
+            and not peak_overlaps[activation.name]
+        ):
+            plan.skipped[activation.name] = "outside_peak_live_set"
+            continue
+        if config.max_candidates is not None and len(plan.recompute) >= config.max_candidates:
+            plan.skipped[activation.name] = "candidate_limit"
             continue
         projected_cost = accumulated_recompute_ms + activation.recompute_cost_ms
         if activation.recompute_cost_ms > 0 and projected_cost > allowed_recompute_ms:

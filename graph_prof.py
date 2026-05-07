@@ -337,9 +337,12 @@ class GraphProfiler(fx.Interpreter):
         enable_io_processing: bool = True,
     ) -> Any:
         self._runtime_tensors = {}
-        return super().run(
-            *args, initial_env=initial_env, enable_io_processing=enable_io_processing
-        )
+        try:
+            return super().run(
+                *args, initial_env=initial_env, enable_io_processing=enable_io_processing
+            )
+        finally:
+            self._runtime_tensors = {}
 
     def run_node(self, n: fx.Node) -> Any:
         use_cuda = torch.cuda.is_available()
