@@ -52,7 +52,7 @@ conda create -n cs265 python=3.12
 conda activate cs265
 pip install numpy==2.2.2
 pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
-pip install transformers matplotlib expecttest
+pip install transformers matplotlib streamlit expecttest
 ```
 
 ## Quick Start
@@ -104,6 +104,17 @@ python benchmarks.py --model "BERT" --batch-sizes 1 2 --seq-len 128 --debug-bert
 python benchmarks.py --model "ResNet-152" --batch-sizes 1 2 4 --memory-budget-mb 6000 --min-savings-mb 0.25 --max-candidates 16 --max-recompute-ratio 1.0
 ```
 
+## Launching The Artifact Demo
+
+```powershell
+streamlit run app.py
+```
+
+The demo is artifact-driven and supports both `ResNet-152` and `BERT` when their
+final-run artifacts are present under `outputs/final_runs_multi`. It loads saved
+profiler summaries, checkpoint plans, rewritten-graph summaries, plots, and sweep
+CSVs without launching new benchmark jobs.
+
 ## Outputs
 
 Benchmark artifacts are saved under [outputs](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs).
@@ -136,6 +147,7 @@ These outputs support reproducibility, benchmarking, analysis, and visualization
 - [graph_prof.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/graph_prof.py): graph profiling, activation lifetime analysis, and summary export.
 - [activation_checkpoint.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/activation_checkpoint.py): checkpoint selection and graph rewrite.
 - [benchmarks.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/benchmarks.py): benchmark runner and plot generation.
+- [app.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/app.py): artifact inspector for ResNet-152 and BERT final runs.
 - [starter_code.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/starter_code.py): lightweight starter example.
 - [docs](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs): supporting project documents, including [experimental_analysis.md](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/experimental_analysis.md), [Instruction.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/Instruction.pdf), [Introduction.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/Introduction.pdf), and [MLSys-2023-two-3-faster-multi-model-training-with-orchestration-and-memory-optimization-Paper-mlsys2023.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/MLSys-2023-two-3-faster-multi-model-training-with-orchestration-and-memory-optimization-Paper-mlsys2023.pdf).
 - [tests](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/tests): validation tests for profiler and rewrite correctness.
