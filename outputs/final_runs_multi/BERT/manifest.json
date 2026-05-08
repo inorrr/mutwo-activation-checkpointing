@@ -3,19 +3,17 @@
   "batch_sizes": [
     1,
     2,
-    4,
-    6,
-    8
+    4
   ],
   "runs": [
     {
       "model_name": "BERT",
       "batch_size": 1,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 92.99759993640085,
-      "latency_ms_std": 1.3814040422439575,
-      "peak_memory_bytes_avg": 1818014208.0,
-      "peak_memory_bytes_max": 1819324928.0,
+      "latency_ms_avg": 177.22800001502037,
+      "latency_ms_std": 15.330570220947266,
+      "peak_memory_bytes_avg": 1801553920.0,
+      "peak_memory_bytes_max": 1801553920.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_1\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_1\\baseline\\profiler_summary.json",
@@ -28,17 +26,17 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "BERT",
       "batch_size": 1,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 117.25000004904966,
-      "latency_ms_std": 2.9984259605407715,
-      "peak_memory_bytes_avg": 1814518954.6666667,
-      "peak_memory_bytes_max": 1814868480.0,
+      "latency_ms_avg": 164.4279332831502,
+      "latency_ms_std": 10.523178100585938,
+      "peak_memory_bytes_avg": 1802078208.0,
+      "peak_memory_bytes_max": 1802078208.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_1\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_1\\ac\\profiler_summary.json",
@@ -51,17 +49,17 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "BERT",
       "batch_size": 2,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 149.68936665294072,
-      "latency_ms_std": 1.98527991771698,
-      "peak_memory_bytes_avg": 1849233920.0,
-      "peak_memory_bytes_max": 1851068928.0,
+      "latency_ms_avg": 251.02113334772488,
+      "latency_ms_std": 24.69910430908203,
+      "peak_memory_bytes_avg": 1817831424.0,
+      "peak_memory_bytes_max": 1817831424.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_2\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_2\\baseline\\profiler_summary.json",
@@ -74,17 +72,17 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "BERT",
       "batch_size": 2,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 188.8598332492014,
-      "latency_ms_std": 5.057191371917725,
-      "peak_memory_bytes_avg": 1851200000.0,
-      "peak_memory_bytes_max": 1853559296.0,
+      "latency_ms_avg": 265.41003336509067,
+      "latency_ms_std": 19.274442672729492,
+      "peak_memory_bytes_avg": 1830414336.0,
+      "peak_memory_bytes_max": 1830414336.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_2\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_2\\ac\\profiler_summary.json",
@@ -97,17 +95,17 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "BERT",
       "batch_size": 4,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 265.94766656247276,
-      "latency_ms_std": 2.629664897918701,
-      "peak_memory_bytes_avg": 2518643712.0,
-      "peak_memory_bytes_max": 2518643712.0,
+      "latency_ms_avg": 388.00373339715105,
+      "latency_ms_std": 23.391984939575195,
+      "peak_memory_bytes_avg": 2537517056.0,
+      "peak_memory_bytes_max": 2537517056.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_4\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_4\\baseline\\profiler_summary.json",
@@ -120,17 +118,17 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "BERT",
       "batch_size": 4,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 334.21246660873294,
-      "latency_ms_std": 3.0739526748657227,
-      "peak_memory_bytes_avg": 1849938432.0,
-      "peak_memory_bytes_max": 1850462720.0,
+      "latency_ms_avg": 375.0653999547164,
+      "latency_ms_std": 24.384498596191406,
+      "peak_memory_bytes_avg": 2424795136.0,
+      "peak_memory_bytes_max": 2424795136.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\BERT\\bs_4\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_4\\ac\\profiler_summary.json",
@@ -143,99 +141,7 @@
         "vocab_size": 4096,
         "image_size": null,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
-      }
-    },
-    {
-      "model_name": "BERT",
-      "batch_size": 6,
-      "use_activation_checkpointing": false,
-      "latency_ms_avg": 381.9111000436048,
-      "latency_ms_std": 4.946649074554443,
-      "peak_memory_bytes_avg": 3214701568.0,
-      "peak_memory_bytes_max": 3214701568.0,
-      "correctness_ok": null,
-      "output_dir": "outputs\\final_runs_multi\\BERT\\bs_6\\baseline",
-      "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_6\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\BERT\\bs_6\\baseline\\peak_memory_breakdown.png",
-      "plan_path": null,
-      "rewritten_profiler_summary_path": null,
-      "metadata": {
-        "device": "cuda",
-        "seq_len": 512,
-        "vocab_size": 4096,
-        "image_size": null,
-        "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
-      }
-    },
-    {
-      "model_name": "BERT",
-      "batch_size": 6,
-      "use_activation_checkpointing": true,
-      "latency_ms_avg": 482.70076676271856,
-      "latency_ms_std": 4.413122653961182,
-      "peak_memory_bytes_avg": 1859555840.0,
-      "peak_memory_bytes_max": 1859555840.0,
-      "correctness_ok": true,
-      "output_dir": "outputs\\final_runs_multi\\BERT\\bs_6\\ac",
-      "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_6\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\BERT\\bs_6\\ac\\peak_memory_breakdown.png",
-      "plan_path": "outputs\\final_runs_multi\\BERT\\bs_6\\ac\\checkpoint_plan.json",
-      "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_6\\ac\\rewritten_profiler_summary.json",
-      "metadata": {
-        "device": "cuda",
-        "seq_len": 512,
-        "vocab_size": 4096,
-        "image_size": null,
-        "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
-      }
-    },
-    {
-      "model_name": "BERT",
-      "batch_size": 8,
-      "use_activation_checkpointing": false,
-      "latency_ms_avg": 628.5951000172645,
-      "latency_ms_std": 80.14176177978516,
-      "peak_memory_bytes_avg": 3919672320.0,
-      "peak_memory_bytes_max": 3919672320.0,
-      "correctness_ok": null,
-      "output_dir": "outputs\\final_runs_multi\\BERT\\bs_8\\baseline",
-      "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_8\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\BERT\\bs_8\\baseline\\peak_memory_breakdown.png",
-      "plan_path": null,
-      "rewritten_profiler_summary_path": null,
-      "metadata": {
-        "device": "cuda",
-        "seq_len": 512,
-        "vocab_size": 4096,
-        "image_size": null,
-        "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
-      }
-    },
-    {
-      "model_name": "BERT",
-      "batch_size": 8,
-      "use_activation_checkpointing": true,
-      "latency_ms_avg": 633.9594333743056,
-      "latency_ms_std": 12.875167846679688,
-      "peak_memory_bytes_avg": 1930383872.0,
-      "peak_memory_bytes_max": 1930383872.0,
-      "correctness_ok": true,
-      "output_dir": "outputs\\final_runs_multi\\BERT\\bs_8\\ac",
-      "profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_8\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\BERT\\bs_8\\ac\\peak_memory_breakdown.png",
-      "plan_path": "outputs\\final_runs_multi\\BERT\\bs_8\\ac\\checkpoint_plan.json",
-      "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\BERT\\bs_8\\ac\\rewritten_profiler_summary.json",
-      "metadata": {
-        "device": "cuda",
-        "seq_len": 512,
-        "vocab_size": 4096,
-        "image_size": null,
-        "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     }
   ],

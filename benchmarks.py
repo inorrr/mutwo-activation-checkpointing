@@ -18,7 +18,6 @@ import torch.fx as fx
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.checkpoint import checkpoint
 from torchvision.models import resnet152
 from transformers import BertConfig, BertForMaskedLM
 
@@ -75,6 +74,12 @@ def _json_default(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     raise TypeError(f"Unsupported JSON value {type(value)}")
+
+
+def _cleanup_memory(device: torch.device) -> None:
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
 
 
 class Experiment:
@@ -174,18 +179,6 @@ class Experiment:
         optimizer.step()
         optimizer.zero_grad()
 
-    def _resnet_forward_checkpointed(self, model: nn.Module, images: torch.Tensor) -> torch.Tensor:
-        x = model.conv1(images)
-        x = model.bn1(x)
-        x = model.relu(x)
-        x = model.maxpool(x)
-        for stage in (model.layer1, model.layer2, model.layer3, model.layer4):
-            for block in stage:
-                x = checkpoint(block, x, use_reentrant=False, preserve_rng_state=False)
-        x = model.avgpool(x)
-        x = torch.flatten(x, 1)
-        return model.fc(x)
-
     def _bert_train_step(
         self,
         model: nn.Module,
@@ -197,37 +190,6 @@ class Experiment:
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-
-    def _enable_runtime_checkpointing(self) -> None:
-        if self.model_name != "BERT":
-            return
-        self.model.config.use_cache = False
-        try:
-            self.model.gradient_checkpointing_enable(
-                gradient_checkpointing_kwargs={
-                    "use_reentrant": False,
-                    "preserve_rng_state": False,
-                }
-            )
-        except TypeError:
-            self.model.gradient_checkpointing_enable()
-
-    def _eager_train_step(self, use_activation_checkpointing: bool, batch: Any) -> None:
-        self.model.train()
-        self.optimizer.zero_grad(set_to_none=True)
-        if self.model_name == "ResNet-152":
-            images, targets = batch
-            logits = (
-                self._resnet_forward_checkpointed(self.model, images)
-                if use_activation_checkpointing
-                else self.model(images)
-            )
-            loss = F.cross_entropy(logits, targets)
-        else:
-            outputs = self.model(**batch)
-            loss = outputs.loss
-        loss.backward()
-        self.optimizer.step()
 
     def init_opt_states(self) -> None:
         for param in self.model.parameters():
@@ -292,40 +254,6 @@ class Experiment:
             latencies.append((time.perf_counter() - start) * 1000.0)
         return latencies, peaks
 
-    def _measure_eager_training(
-        self,
-        use_activation_checkpointing: bool,
-        iterations: int = 3,
-        warmup_iterations: int = 1,
-    ) -> Tuple[List[float], List[int]]:
-        if use_activation_checkpointing:
-            self._enable_runtime_checkpointing()
-
-        latencies: List[float] = []
-        peaks: List[int] = []
-        gc.collect()
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
-
-        for _ in range(warmup_iterations):
-            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
-
-        for _ in range(iterations):
-            if self.device.type == "cuda":
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()
-                torch.cuda.synchronize()
-            start = time.perf_counter()
-            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
-            if self.device.type == "cuda":
-                torch.cuda.synchronize()
-                peaks.append(torch.cuda.max_memory_allocated())
-            else:
-                peaks.append(0)
-            latencies.append((time.perf_counter() - start) * 1000.0)
-        return latencies, peaks
-
     def _validate_correctness(
         self,
         transformed_gm: fx.GraphModule,
@@ -363,7 +291,7 @@ class Experiment:
             "vocab_size": self.vocab_size if self.model_name == "BERT" else None,
             "image_size": self.image_size if self.model_name == "ResNet-152" else None,
             "debug_bert": self.debug_bert,
-            "measurement_mode": "eager_runtime_checkpointing",
+            "measurement_mode": "custom_fx_graph_rewrite",
         }
         artifacts_dir = self.output_dir / ("ac" if use_activation_checkpointing else "baseline")
         artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -408,20 +336,34 @@ class Experiment:
             capture["correctness_ok"] = self._validate_correctness(
                 rewritten_gm, original_gm, args
             )
-            rewritten_profiler = GraphProfiler(rewritten_gm)
-            with torch.no_grad():
-                for _ in range(profiler_iters):
-                    rewritten_profiler.run(*args)
-            rewritten_profiler.aggregate_stats()
-            capture["rewritten_summary_path"] = rewritten_profiler.export_summary(
-                artifacts_dir / "rewritten_profiler_summary.json"
-            )
+            _cleanup_memory(self.device)
+            try:
+                rewritten_profiler = GraphProfiler(rewritten_gm)
+                with torch.no_grad():
+                    for _ in range(profiler_iters):
+                        rewritten_profiler.run(*args)
+                rewritten_profiler.aggregate_stats()
+                capture["rewritten_summary_path"] = rewritten_profiler.export_summary(
+                    artifacts_dir / "rewritten_profiler_summary.json"
+                )
+            except torch.OutOfMemoryError as exc:
+                _cleanup_memory(self.device)
+                capture["rewritten_summary_path"] = None
+                self._write_json(
+                    {
+                        "error": "rewritten_profiler_oom",
+                        "message": str(exc).splitlines()[0],
+                        "plan_recompute_count": len(plan.recompute),
+                    },
+                    artifacts_dir / "rewritten_profiler_summary_error.json",
+                )
             rewritten_gm._ac_run_with_interpreter = True
             return rewritten_gm
 
         compiled_fn = compile(self.train_step, graph_transformation)
         compiled_fn(self.model, self.optimizer, self.example_inputs)
-        latencies, peaks = self._measure_eager_training(use_activation_checkpointing)
+        _cleanup_memory(self.device)
+        latencies, peaks = self._measure_compiled_fn(compiled_fn)
 
         return RunResult(
             model_name=self.model_name,
@@ -588,7 +530,6 @@ def run_sweep(
         for run in runs
     ]
     _write_csv(rows, output_dir / "sweep_results.csv")
-    _write_csv(rows, output_dir / "sweep_results_for_demo.csv")
 
     memory_plot = _plot_sweep(
         runs,
@@ -635,8 +576,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--debug-bert", action="store_true")
     parser.add_argument("--memory-budget-mb", type=float, default=None)
-    parser.add_argument("--min-savings-mb", type=float, default=1.0)
-    parser.add_argument("--max-recompute-ratio", type=float, default=0.35)
+    parser.add_argument("--min-savings-mb", type=float, default=0.25)
+    parser.add_argument("--max-recompute-ratio", type=float, default=1.0)
+    parser.add_argument("--max-candidates", type=int, default=8)
     return parser.parse_args()
 
 
@@ -647,6 +589,7 @@ if __name__ == "__main__":
         memory_budget_mb=args.memory_budget_mb,
         min_savings_mb=args.min_savings_mb,
         max_recompute_ratio=args.max_recompute_ratio,
+        max_candidates=args.max_candidates,
     )
     result = run_sweep(
         model_name=args.model,

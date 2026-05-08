@@ -138,6 +138,7 @@ def _rematerialize_optimizer(
     opt: optim.Optimizer,
     named_states: Dict[str, Any],
     params: Dict[str, nn.Parameter],
+    param_name_by_id: Dict[int, str],
 ):
     assert opt is not None
 
@@ -147,15 +148,23 @@ def _rematerialize_optimizer(
         # opt.state's key type is string, but optimizer uses Parameter as keys
         opt.state[params[n]] = named_states[n]  # type: ignore[index]
 
-    # FIXME: support multiple parameter groups
-    param_group = opt.param_groups[0]
-    orig_params = param_group["params"]
-    param_group["params"] = params.values()
+    orig_param_groups = [
+        (param_group, list(param_group["params"])) for param_group in opt.param_groups
+    ]
+    for param_group, orig_params in orig_param_groups:
+        rematerialized_params = []
+        for param in orig_params:
+            param_name = param_name_by_id.get(id(param))
+            if param_name is None:
+                raise RuntimeError("Optimizer parameter is not owned by the traced module.")
+            rematerialized_params.append(params[param_name])
+        param_group["params"] = rematerialized_params
 
     try:
         yield
     finally:
-        param_group["params"] = orig_params
+        for param_group, orig_params in orig_param_groups:
+            param_group["params"] = orig_params
         opt.state = orig_states
 
 
@@ -206,6 +215,9 @@ def _compile(func: Callable, *args: Any, **kwargs: Any):
 
     # 2. Trace the stateless version of the train_step
     params = dict(mod.named_parameters(remove_duplicate=False))
+    param_name_by_id: Dict[int, str] = {}
+    for name, param in params.items():
+        param_name_by_id.setdefault(id(param), name)
     buffers = dict(mod.named_buffers(remove_duplicate=False))
 
     named_states: Dict[str, nn.Parameter] = {}
@@ -232,7 +244,7 @@ def _compile(func: Callable, *args: Any, **kwargs: Any):
         with stateless._reparametrize_module(
             mod, {**params, **buffers}
         ), _rematerialize_optimizer(
-            opt, named_states, params
+            opt, named_states, params, param_name_by_id
         ) if opt else nullcontext():
             # Installing hooks onto gradients to identify the gradients.
             with gradients_tagging(params):

@@ -2,7 +2,7 @@
 
 ![Project overview](docs/project_overview.png)
 
-This repository presents an activation checkpointing prototype built with PyTorch FX tracing. It extends the [Harvard CS265](http://daslab.seas.harvard.edu/classes/cs265/) starter scaffold into a complete workflow for graph capture, profiling, checkpoint planning, benchmarking, and interactive visualization.
+This repository presents an activation checkpointing prototype built with PyTorch FX tracing. It extends the [Harvard CS265](http://daslab.seas.harvard.edu/classes/cs265/) starter scaffold into a complete workflow for graph capture, profiling, checkpoint planning, benchmarking, and experimental analysis.
 
 The main components are:
 
@@ -10,7 +10,6 @@ The main components are:
 - [graph_prof.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/graph_prof.py): performs static and runtime profiling of traced graphs.
 - [activation_checkpoint.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/activation_checkpoint.py): builds activation checkpointing plans and rewrites graphs accordingly.
 - [benchmarks.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/benchmarks.py): runs baseline and checkpointed experiments for `ResNet-152` and `BERT`.
-- [app.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/app.py): launches a Streamlit interface for inspecting results interactively.
 
 ## Overview
 
@@ -26,7 +25,8 @@ The main components are:
 
 - Uses a practical heuristic inspired by [`mu-TWO`](https://proceedings.mlsys.org/paper_files/paper/2023/file/a72071d84c001596e97a2c7e1e880559-Paper-mlsys2023.pdf).
 - Ranks activations by estimated memory savings relative to recomputation cost.
-- Supports a memory budget, a recomputation budget ratio, and a minimum activation-size threshold.
+- Supports a memory budget, candidate-count limit, recomputation budget ratio, and minimum activation-size threshold.
+- Defaults to a more aggressive custom-FX policy than the original baseline: up to `8` recomputed activations, `0.25 MB` minimum estimated savings per activation, and a recompute budget up to `1.0x` measured forward-pass time. The candidate limit can be raised with `--max-candidates` for models that have enough GPU headroom.
 - Produces a retained-versus-recomputed activation plan for inspection and analysis.
 
 ### Graph rewrite
@@ -40,11 +40,10 @@ The main components are:
 
 - Runs baseline versus activation-checkpointed experiments for `ResNet-152` and `BERT`.
 - Saves profiler summaries, checkpoint plans, peak-memory plots, sweep CSVs, and manifests.
-- Provides a Streamlit frontend for interactive experimentation and result inspection.
 
 ## Environment Setup
 
-The project assumes Python 3.12 and a CUDA-capable PyTorch installation for the full benchmarking and demo workflow.
+The project assumes Python 3.12 and a CUDA-capable PyTorch installation for the full benchmarking workflow.
 
 ### Conda environment
 
@@ -53,7 +52,7 @@ conda create -n cs265 python=3.12
 conda activate cs265
 pip install numpy==2.2.2
 pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
-pip install transformers matplotlib streamlit expecttest
+pip install transformers matplotlib expecttest
 ```
 
 ## Quick Start
@@ -76,7 +75,7 @@ python starter_code.py --use-ac --output-dir outputs/starter_ac
 ### Validation tests
 
 ```powershell
-python -m unittest tests.test_graph_profiler tests.test_activation_checkpoint
+python -m unittest tests.test_graph_profiler tests.test_activation_checkpoint tests.test_graph_tracer
 ```
 
 ## Running Benchmarks
@@ -102,28 +101,12 @@ python benchmarks.py --model "BERT" --batch-sizes 1 2 --seq-len 128 --debug-bert
 ### Tuning the checkpoint policy
 
 ```powershell
-python benchmarks.py --model "ResNet-152" --batch-sizes 1 2 4 --memory-budget-mb 6000 --max-recompute-ratio 0.25
+python benchmarks.py --model "ResNet-152" --batch-sizes 1 2 4 --memory-budget-mb 6000 --min-savings-mb 0.25 --max-candidates 16 --max-recompute-ratio 1.0
 ```
-
-## Launching the Frontend Demo
-
-```powershell
-streamlit run app.py
-```
-
-The app supports:
-
-- model selection,
-- batch size selection,
-- activation checkpointing toggle,
-- checkpoint policy tuning,
-- viewing profiler summaries,
-- viewing retained versus recomputed activations,
-- viewing saved peak-memory and sweep plots.
 
 ## Outputs
 
-Benchmark and demo artifacts are saved under [outputs](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs).
+Benchmark artifacts are saved under [outputs](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs).
 
 Typical generated files include:
 
@@ -140,7 +123,7 @@ These outputs support reproducibility, benchmarking, analysis, and visualization
 
 ## Assumptions and Limitations
 
-- Full benchmark and demo flows assume CUDA for meaningful memory measurements.
+- Full benchmark flows assume CUDA for meaningful memory measurements.
 - The `BERT` benchmark path uses a randomly initialized BERT-style masked language model created from configuration, not a downloaded pretrained checkpoint.
 - The `--debug-bert` option uses a reduced BERT configuration for quicker validation and iteration.
 - The checkpoint policy is heuristic and profiler-driven rather than an exact reproduction of [`mu-TWO`](https://proceedings.mlsys.org/paper_files/paper/2023/file/a72071d84c001596e97a2c7e1e880559-Paper-mlsys2023.pdf).
@@ -154,6 +137,5 @@ These outputs support reproducibility, benchmarking, analysis, and visualization
 - [activation_checkpoint.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/activation_checkpoint.py): checkpoint selection and graph rewrite.
 - [benchmarks.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/benchmarks.py): benchmark runner and plot generation.
 - [starter_code.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/starter_code.py): lightweight starter example.
-- [app.py](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/app.py): Streamlit demo frontend.
 - [docs](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs): supporting project documents, including [experimental_analysis.md](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/experimental_analysis.md), [Instruction.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/Instruction.pdf), [Introduction.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/Introduction.pdf), and [MLSys-2023-two-3-faster-multi-model-training-with-orchestration-and-memory-optimization-Paper-mlsys2023.pdf](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/docs/MLSys-2023-two-3-faster-multi-model-training-with-orchestration-and-memory-optimization-Paper-mlsys2023.pdf).
 - [tests](C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/tests): validation tests for profiler and rewrite correctness.

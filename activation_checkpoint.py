@@ -15,10 +15,10 @@ from graph_tracer import SEPFunction
 @dataclass
 class ActivationCheckpointConfig:
     memory_budget_mb: Optional[float] = None
-    min_savings_mb: float = 1.0
-    max_recompute_ratio: float = 0.35
+    min_savings_mb: float = 0.25
+    max_recompute_ratio: float = 1.0
     min_recompute_budget_ms: float = 1.0
-    max_candidates: Optional[int] = 4
+    max_candidates: Optional[int] = 8
     prefer_peak_overlap: bool = True
     exclude_view_like_ops: bool = True
 
@@ -377,6 +377,12 @@ def build_checkpoint_plan(
         "algorithm": "mutwo_simplified_recompute_only",
         "initial_peak_bytes": summary.total_peak_bytes,
         "memory_limit_bytes": memory_limit_bytes,
+        "min_savings_mb": config.min_savings_mb,
+        "max_candidates": config.max_candidates,
+        "max_recompute_ratio": config.max_recompute_ratio,
+        "min_recompute_budget_ms": config.min_recompute_budget_ms,
+        "prefer_peak_overlap": config.prefer_peak_overlap,
+        "exclude_view_like_ops": config.exclude_view_like_ops,
         "allowed_recompute_ms": allowed_recompute_ms,
         "estimated_recompute_ms": accumulated_recompute_ms,
     }
