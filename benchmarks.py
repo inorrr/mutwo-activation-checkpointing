@@ -33,6 +33,8 @@ from graph_tracer import SEPFunction, compile
 DEFAULT_OUTPUT_DIR = Path("outputs")
 
 
+# Per-run artifact and measurement record. One RunResult corresponds to one
+# model, one batch size, and either baseline or activation-checkpointed mode.
 @dataclass
 class RunResult:
     model_name: str
@@ -51,6 +53,7 @@ class RunResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# Sweep-level record collecting all batch-size runs for a model.
 @dataclass
 class SweepResult:
     model_name: str
@@ -65,6 +68,7 @@ def _device() -> torch.device:
 
 
 def _optimizer_kwargs(device: torch.device) -> Dict[str, Any]:
+    # capturable=True is required for CUDA Adam when the optimizer step is traced.
     if device.type == "cuda":
         return {"capturable": True, "foreach": True}
     return {"foreach": True}
@@ -82,6 +86,7 @@ def _cleanup_memory(device: torch.device) -> None:
         torch.cuda.empty_cache()
 
 
+# one model/batch-size experiment
 class Experiment:
     model_names = ["ResNet-152", "BERT"]
     default_batch_sizes: Dict[str, List[int]] = {
@@ -129,6 +134,8 @@ class Experiment:
         )
 
     def _build_bert(self) -> BertForMaskedLM:
+        # Build BERT from config rather than downloading pretrained weights.
+        # debug_bert preserves the benchmark path while making iterations faster.
         if self.debug_bert:
             config = BertConfig(
                 vocab_size=self.vocab_size,
@@ -150,16 +157,18 @@ class Experiment:
         return BertForMaskedLM(config)
 
     def _make_resnet_batch(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Synthetic image classification batch
         images = torch.randn(batch_size, 3, self.image_size, self.image_size, device=self.device)
-        targets = torch.randint(0, 1000, (batch_size,), device=self.device)
+        targets = torch.randint(0, 1000, (batch_size,), device=self.device) #graph-level
         return images, targets
 
     def _make_bert_batch(self, batch_size: int) -> Dict[str, torch.Tensor]:
+        # Synthetic masked-language-modeling batch
         input_ids = torch.randint(
             0, self.vocab_size, (batch_size, self.seq_len), device=self.device
         )
         attention_mask = torch.ones_like(input_ids, device=self.device)
-        labels = input_ids.clone()
+        labels = input_ids.clone() #mirror input_ids so the model produces a valid training loss
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -185,6 +194,7 @@ class Experiment:
         optimizer: optim.Optimizer,
         batch: Dict[str, torch.Tensor],
     ) -> None:
+        # HuggingFace model returns the loss directly when labels are supplied.
         outputs = model(**batch)
         loss = SEPFunction.apply(outputs.loss)
         loss.backward()
@@ -192,6 +202,7 @@ class Experiment:
         optimizer.zero_grad()
 
     def init_opt_states(self) -> None:
+        # Adam creates state lazily
         for param in self.model.parameters():
             if param.requires_grad:
                 param.grad = torch.rand_like(param)
@@ -199,6 +210,7 @@ class Experiment:
         self.optimizer.zero_grad()
 
     def _new_batch_like(self) -> Any:
+        # fresh synthetic batches
         if self.model_name == "ResNet-152":
             return self._make_resnet_batch(self.batch_size)
         return self._make_bert_batch(self.batch_size)
@@ -222,6 +234,7 @@ class Experiment:
         return output_path
 
     def _write_json(self, payload: Dict[str, Any], path: Path) -> Path:
+        # Centralized JSON writer for plan/manifest/error artifacts.
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, default=_json_default), encoding="utf-8")
         return path
@@ -232,6 +245,8 @@ class Experiment:
         iterations: int = 3,
         warmup_iterations: int = 1,
     ) -> Tuple[List[float], List[int]]:
+        # Time repeated executions of the already-compiled graph. CUDA runs also
+        # record allocator peak memory for each measured iteration.
         latencies: List[float] = []
         peaks: List[int] = []
         gc.collect()
@@ -241,6 +256,8 @@ class Experiment:
         for _ in range(warmup_iterations):
             compiled_fn(self.model, self.optimizer, self._new_batch_like())
         for _ in range(iterations):
+            # Reset CUDA peak stats for each iteration so max_memory_allocated is
+            # attributable to that iteration rather than the whole process.
             if self.device.type == "cuda":
                 torch.cuda.reset_peak_memory_stats()
                 torch.cuda.synchronize()
@@ -260,11 +277,13 @@ class Experiment:
         original_gm: fx.GraphModule,
         flat_args: List[torch.Tensor],
     ) -> bool:
+        # Compare original and rewritten GraphModule outputs on identical flat inputs
         with torch.no_grad():
             baseline = original_gm(*flat_args)
             transformed = transformed_gm(*flat_args)
 
         def flatten(value: Any) -> Iterable[torch.Tensor]:
+            # Graph outputs may be nested
             if isinstance(value, torch.Tensor):
                 yield value
                 return
@@ -284,6 +303,8 @@ class Experiment:
         checkpoint_config: Optional[ActivationCheckpointConfig] = None,
         profiler_iters: int = 2,
     ) -> RunResult:
+        # Execute one baseline or activation-checkpointed run and write the
+        # artifacts needed for later analysis/demo.
         self.init_opt_states()
         metadata: Dict[str, Any] = {
             "device": str(self.device),
@@ -299,6 +320,8 @@ class Experiment:
         capture: Dict[str, Any] = {}
 
         def graph_transformation(gm: fx.GraphModule, args: Any) -> fx.GraphModule:
+            # This callback runs exactly once, immediately after tracing and
+            # before benchmark timing starts.
             profiler = GraphProfiler(gm)
             with torch.no_grad():
                 for _ in range(profiler_iters):
@@ -317,9 +340,11 @@ class Experiment:
             gm._ac_run_with_interpreter = True
 
             if not use_activation_checkpointing:
+                # Baseline keeps the traced graph unchanged
                 capture["correctness_ok"] = None
                 return gm
 
+            # Rewrite a copy of the traced graph according to the checkpoint plan, then validate it
             original_gm = copy.deepcopy(gm)
             rewritten_gm, plan = activation_checkpointing(
                 gm, profiler, checkpoint_config or ActivationCheckpointConfig()
@@ -338,6 +363,7 @@ class Experiment:
             )
             _cleanup_memory(self.device)
             try:
+                # Profile the rewritten graph too
                 rewritten_profiler = GraphProfiler(rewritten_gm)
                 with torch.no_grad():
                     for _ in range(profiler_iters):
@@ -361,6 +387,7 @@ class Experiment:
             return rewritten_gm
 
         compiled_fn = compile(self.train_step, graph_transformation)
+        # First call triggers tracing/profiling/rewrite. Later calls are measured.
         compiled_fn(self.model, self.optimizer, self.example_inputs)
         _cleanup_memory(self.device)
         latencies, peaks = self._measure_compiled_fn(compiled_fn)
@@ -388,6 +415,7 @@ class Experiment:
 
 
 def _write_csv(rows: List[Dict[str, Any]], path: Path) -> Path:
+    # Persist sweep-level tabular results for plotting and later analysis.
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         return path
@@ -531,6 +559,7 @@ def run_sweep(
     ]
     _write_csv(rows, output_dir / "sweep_results.csv")
 
+    # Standard plot artifacts used by the report and Streamlit app.
     memory_plot = _plot_sweep(
         runs,
         metric="peak_memory_bytes_max",
@@ -567,6 +596,7 @@ def run_sweep(
 
 
 def parse_args() -> argparse.Namespace:
+    # CLI used for final experiments and smaller debug sweeps.
     parser = argparse.ArgumentParser(description="Run activation checkpointing benchmarks.")
     parser.add_argument("--model", choices=Experiment.model_names, required=True)
     parser.add_argument("--batch-sizes", nargs="+", type=int)
@@ -584,7 +614,9 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
+    # If batch sizes are not supplied, use the model-specific defaults.
     batch_sizes = args.batch_sizes or Experiment.default_batch_sizes[args.model]
+    # Command-line policy knobs are passed directly into the checkpoint planner.
     config = ActivationCheckpointConfig(
         memory_budget_mb=args.memory_budget_mb,
         min_savings_mb=args.min_savings_mb,

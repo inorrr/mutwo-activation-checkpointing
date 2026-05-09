@@ -28,6 +28,7 @@ class NodeType(str, Enum):
     OTHER = "other"
 
 
+# Per-FX-node runtime measurements accumulated across profiler runs.
 @dataclass
 class NodeRuntimeStat:
     name: str
@@ -44,6 +45,7 @@ class NodeRuntimeStat:
     samples: int = 0
 
 
+# Static activation-lifetime record used by the checkpoint planner.
 @dataclass
 class ActivationInfo:
     name: str
@@ -60,6 +62,7 @@ class ActivationInfo:
     retained: bool = True
 
 
+# Serializable top-level profiler artifact written to profiler_summary.json.
 @dataclass
 class ProfilerSummary:
     node_stats: List[NodeRuntimeStat]
@@ -76,12 +79,14 @@ class ProfilerSummary:
 
 
 def _target_name(target: Any) -> str:
+    # Turn an FX target into stable, readable text for JSON output and debugging.
     if hasattr(target, "__module__") and hasattr(target, "__name__"):
         return f"{target.__module__}.{target.__name__}"
     return str(target)
 
 
 def _flatten_tensors(value: Any) -> Iterable[torch.Tensor]:
+    # Graph nodes may return tensors nested inside tuples/lists/dicts.
     if isinstance(value, torch.Tensor):
         yield value
         return
@@ -95,10 +100,12 @@ def _flatten_tensors(value: Any) -> Iterable[torch.Tensor]:
 
 
 def _tensor_bytes_from_runtime(value: Any) -> int:
+    # Runtime fallback for output size when fake-tensor metadata is incomplete.
     return sum(t.numel() * t.element_size() for t in _flatten_tensors(value))
 
 
 def _tensor_bytes_from_meta(node: fx.Node) -> int:
+    # Preferred static estimate: fake tensor metadata records shape and dtype.
     val = node.meta.get("val")
     return sum(t.numel() * t.element_size() for t in _flatten_tensors(val))
 
@@ -118,6 +125,8 @@ def _tensor_dtype_from_meta(node: fx.Node) -> Optional[str]:
 
 
 def _sum_placeholder_bytes(metadata: List[Any], role: str) -> int:
+    # Placeholder metadata comes from graph_tracer and gives parameters,
+    # buffers, and optimizer state explicit memory categories.
     total = 0
     for item in metadata:
         if getattr(item, "role", None) != role or getattr(item, "shape", None) is None:
@@ -133,6 +142,7 @@ def _sum_placeholder_bytes(metadata: List[Any], role: str) -> int:
 
 
 def _role_to_node_type(role: str) -> NodeType:
+    # Convert tracer-side placeholder roles to profiler-side node categories.
     mapping = {
         "parameter": NodeType.PARAM,
         "buffer": NodeType.BUFFER,
@@ -143,6 +153,7 @@ def _role_to_node_type(role: str) -> NodeType:
     return mapping.get(role, NodeType.OTHER)
 
 
+# FX Interpreter subclass that observes every node as the graph executes.
 class GraphProfiler(fx.Interpreter):
     def __init__(
         self,
@@ -152,6 +163,8 @@ class GraphProfiler(fx.Interpreter):
     ):
         super().__init__(module, garbage_collect_values)
         self.verbose = verbose
+        # Cache graph order because lifetime analysis is expressed in node
+        # indices: create index, last forward use, first backward use, and peak.
         self.nodes = list(self.module.graph.nodes)
         self.node_to_index = {node: idx for idx, node in enumerate(self.nodes)}
         self.placeholder_metadata = list(
@@ -164,6 +177,8 @@ class GraphProfiler(fx.Interpreter):
         self._backward_sep_index = self._find_boundary_index(
             torch.ops.separator.sep_backward.default
         )
+        # Optimizer may be absent in toy graphs; in that case it starts after
+        # the final node, so backward covers the rest of the graph.
         self._optimizer_start_index = self._find_optimizer_start_index()
         self.node_categories = self._infer_node_categories()
         self.activations = self._analyze_activations()
@@ -174,12 +189,15 @@ class GraphProfiler(fx.Interpreter):
         self.gradient_bytes = self._estimate_gradient_bytes()
 
     def _find_boundary_index(self, target: Any) -> int:
+        # Separator ops inserted by SEPFunction are the reliable phase markers.
         for idx, node in enumerate(self.nodes):
             if node.target == target:
                 return idx
         raise RuntimeError(f"Unable to find graph boundary node for target {target}.")
 
     def _find_optimizer_start_index(self) -> int:
+        # Detect common optimizer ops so phases can be labeled as
+        # forward/backward/optimizer rather than just forward/backward.
         optimizer_markers = {
             torch.ops.aten._fused_adam.default,
             torch.ops.aten._foreach_add.Scalar,
@@ -201,10 +219,14 @@ class GraphProfiler(fx.Interpreter):
 
     def _infer_node_categories(self) -> Dict[str, NodeType]:
         categories: Dict[str, NodeType] = {}
+        # Placeholder roles are explicit because graph_tracer attached metadata
+        # when it lifted parameters, buffers, and optimizer state.
         placeholders = [node for node in self.nodes if node.op == OP.PLACEHOLDER.value]
         for node, metadata in zip(placeholders, self.placeholder_metadata):
             categories[node.name] = _role_to_node_type(metadata.role)
 
+        # Non-placeholder nodes are categorized by graph phase. Values before
+        # backward are treated as activations; backward-region outputs are grads.
         for node in self.nodes:
             if node.name in categories:
                 continue
@@ -218,6 +240,8 @@ class GraphProfiler(fx.Interpreter):
         return categories
 
     def _estimate_gradient_bytes(self) -> int:
+        # A parameter's gradient has the same shape/dtype as the parameter in
+        # the standard dense training path used by these experiments.
         total = 0
         for item in self.placeholder_metadata:
             if getattr(item, "role", None) != "parameter" or getattr(item, "shape", None) is None:
@@ -232,6 +256,7 @@ class GraphProfiler(fx.Interpreter):
         return total
 
     def _phase_for_index(self, idx: int) -> str:
+        # Translate a graph index into the human-readable execution phase.
         if idx <= self._forward_sep_index:
             return "forward"
         if idx < self._optimizer_start_index:
@@ -239,6 +264,8 @@ class GraphProfiler(fx.Interpreter):
         return "optimizer"
 
     def _activation_candidates(self) -> List[fx.Node]:
+        # A checkpointable activation is created before backward and consumed by
+        # at least one backward-region node.
         candidates: List[fx.Node] = []
         for node in self.nodes:
             idx = self.node_to_index[node]
@@ -256,12 +283,16 @@ class GraphProfiler(fx.Interpreter):
         return candidates
 
     def _activation_frontier(self, node: fx.Node) -> List[str]:
+        # The frontier is the set of retained inputs needed to recompute this
+        # activation without replaying the entire forward graph.
         frontier: List[str] = []
         visited: set[str] = set()
 
         def visit(cur: fx.Node):
             for input_node in cur.all_input_nodes:
                 input_idx = self.node_to_index[input_node]
+                # Placeholders are stable roots: parameters, buffers, optimizer
+                # state, and user inputs are still available at recompute time.
                 if input_node.op == OP.PLACEHOLDER.value:
                     if input_node.name not in visited:
                         frontier.append(input_node.name)
@@ -269,6 +300,8 @@ class GraphProfiler(fx.Interpreter):
                     continue
                 if input_idx >= self._backward_sep_index:
                     continue
+                # If an upstream activation is itself a backward-needed value,
+                # stop there so plans can retain/recompute it independently.
                 if self.node_categories.get(input_node.name) == NodeType.ACT and input_node.name != node.name:
                     if any(
                         self.node_to_index[user] >= self._backward_sep_index
@@ -284,6 +317,7 @@ class GraphProfiler(fx.Interpreter):
         return sorted(frontier)
 
     def _analyze_activations(self) -> List[ActivationInfo]:
+        # Convert candidate nodes into lifetime records consumed by the planner.
         activations: List[ActivationInfo] = []
         for node in self._activation_candidates():
             idx = self.node_to_index[node]
@@ -299,6 +333,8 @@ class GraphProfiler(fx.Interpreter):
             )
             if not backward_users:
                 continue
+            # last_forward_use controls how early recomputed activations can be
+            # freed; first_backward_use controls where recomputation is inserted.
             activations.append(
                 ActivationInfo(
                     name=node.name,
@@ -316,6 +352,7 @@ class GraphProfiler(fx.Interpreter):
         return sorted(activations, key=lambda item: item.create_index)
 
     def _ensure_stat(self, node: fx.Node) -> NodeRuntimeStat:
+        # Lazily create stats because run_node sees nodes in execution order.
         existing = self.runtime_stats.get(node.name)
         if existing is not None:
             return existing
@@ -336,6 +373,8 @@ class GraphProfiler(fx.Interpreter):
         initial_env: Dict[fx.Node, Any] | None = None,
         enable_io_processing: bool = True,
     ) -> Any:
+        # Runtime tensors are only kept while a single profiler execution is in
+        # progress so profiling does not accidentally extend activation lives.
         self._runtime_tensors = {}
         try:
             return super().run(
@@ -345,6 +384,8 @@ class GraphProfiler(fx.Interpreter):
             self._runtime_tensors = {}
 
     def run_node(self, n: fx.Node) -> Any:
+        # Measure each FX node. CUDA timing/memory is synchronized for accuracy;
+        # CPU mode still records graph/output-size information but timing is 0.
         use_cuda = torch.cuda.is_available()
         if use_cuda:
             torch.cuda.synchronize()
@@ -371,6 +412,7 @@ class GraphProfiler(fx.Interpreter):
             memory_after = 0
             peak_after = 0
 
+        # Accumulate totals; aggregate_stats later converts totals to averages.
         stat = self._ensure_stat(n)
         stat.elapsed_ms_total += elapsed_ms
         stat.memory_before_bytes_total += int(memory_before)
@@ -385,11 +427,15 @@ class GraphProfiler(fx.Interpreter):
                 f"{elapsed_ms:8.3f} ms"
             )
 
+        # Refresh activation sizes from real outputs if fake metadata was absent
+        # or could not represent a nested output shape.
         self._runtime_tensors[n.name] = result
         self._refresh_activation_sizes(n.name, result)
         return result
 
     def _refresh_activation_sizes(self, node_name: str, value: Any) -> None:
+        # Some FX metadata can be missing for complex nodes; runtime values give
+        # a practical fallback for size, shape, and dtype.
         output_bytes = _tensor_bytes_from_runtime(value)
         if output_bytes == 0:
             return
@@ -403,9 +449,12 @@ class GraphProfiler(fx.Interpreter):
                         break
 
     def reset_stats(self) -> None:
+        # Clear runtime measurements while preserving static graph analysis.
         self.runtime_stats = {}
 
     def aggregate_stats(self) -> None:
+        # Convert accumulated totals into averages and compute per-activation
+        # recompute estimates from measured producer-chain costs.
         for stat in self.runtime_stats.values():
             if stat.samples == 0:
                 continue
@@ -417,6 +466,8 @@ class GraphProfiler(fx.Interpreter):
         self.latest_summary = self.build_summary()
 
     def _estimate_recompute_cost(self, activation: ActivationInfo) -> float:
+        # Walk backward from the activation to its recompute frontier and sum
+        # profiled forward-node costs along that producer chain.
         name_to_node = {node.name: node for node in self.nodes}
         stop_names = set(activation.required_input_names)
         visited: set[str] = set()
@@ -441,12 +492,16 @@ class GraphProfiler(fx.Interpreter):
         return visit(name_to_node[activation.name])
 
     def node_to_index_by_name(self, name: str) -> int:
+        # Helper used to sort serialized stats back into graph order.
         for node in self.nodes:
             if node.name == name:
                 return self.node_to_index[node]
         raise KeyError(name)
 
     def _activation_timeline(self) -> List[Dict[str, int]]:
+        # Static lifetime model: each activation is live from creation through
+        # first backward use unless the checkpoint planner later simulates a
+        # shorter lifetime.
         timeline: List[Dict[str, int]] = []
         for idx, _node in enumerate(self.nodes):
             activation_live = 0
@@ -472,6 +527,8 @@ class GraphProfiler(fx.Interpreter):
         return timeline
 
     def build_summary(self) -> ProfilerSummary:
+        # Build the JSON-friendly summary consumed by the app, benchmarks, and
+        # checkpoint planner.
         timeline = self._activation_timeline()
         peak_entry = max(timeline, key=lambda item: item["total_bytes"])
         peak_breakdown = {
@@ -505,6 +562,7 @@ class GraphProfiler(fx.Interpreter):
         )
 
     def print_stats(self, limit: int = 20) -> None:
+        # Human-readable console summary for the starter example and debugging.
         summary = self.latest_summary or self.build_summary()
         print("Graph profiler summary")
         print(
@@ -534,6 +592,8 @@ class GraphProfiler(fx.Interpreter):
             )
 
     def export_summary(self, output_path: str | Path) -> Path:
+        # Persist the profiler artifact so the demo app and reports can inspect
+        # the run without rerunning model training.
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         summary = self.latest_summary or self.build_summary()
