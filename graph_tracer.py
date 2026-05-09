@@ -220,6 +220,40 @@ class PlaceholderMetadata:
     requires_grad: bool = False
 
 
+def _pytree_path_to_name(path: Any) -> str:
+    # Convert PyTree path entries such as MappingKey("exp_avg") into a readable
+    # dotted name that lines up with flattened graph placeholders.
+    parts: List[str] = []
+    for entry in path:
+        if hasattr(entry, "key"):
+            parts.append(str(entry.key))
+        elif hasattr(entry, "idx"):
+            parts.append(str(entry.idx))
+        else:
+            parts.append(str(entry))
+    return ".".join(parts)
+
+
+def _placeholder_metadata_for_flattened_tree(
+    tree: Any, role_for_leaf: Callable[[str, Any], str]
+) -> List[PlaceholderMetadata]:
+    metadata: List[PlaceholderMetadata] = []
+    for path, leaf in pytree.tree_flatten_with_path(tree)[0]:
+        if not isinstance(leaf, torch.Tensor):
+            continue
+        name = _pytree_path_to_name(path)
+        metadata.append(
+            PlaceholderMetadata(
+                name=name,
+                role=role_for_leaf(name, leaf),
+                shape=getattr(leaf, "shape", None),
+                dtype=getattr(leaf, "dtype", None),
+                requires_grad=bool(getattr(leaf, "requires_grad", False)),
+            )
+        )
+    return metadata
+
+
 def _compile(func: Callable, *args: Any, **kwargs: Any):
     # Find the module and optimizer from the user's training-step arguments.
     # This prototype supports one model and one optimizer per compiled function.
@@ -312,26 +346,15 @@ def _compile(func: Callable, *args: Any, **kwargs: Any):
     # [parameters, buffers, optimizer_state, original_args, original_kwargs].
     flat_state, _ = pytree.tree_flatten([params_and_buffers, named_states])
 
-    placeholder_metadata: List[PlaceholderMetadata] = []
-    placeholder_metadata.extend(
-        PlaceholderMetadata(
-            name=name,
-            role="parameter" if isinstance(tensor, nn.Parameter) else "buffer",
-            shape=getattr(tensor, "shape", None),
-            dtype=getattr(tensor, "dtype", None),
-            requires_grad=bool(getattr(tensor, "requires_grad", False)),
-        )
-        for name, tensor in params_and_buffers.items()
+    placeholder_metadata = _placeholder_metadata_for_flattened_tree(
+        params_and_buffers,
+        lambda _name, tensor: "parameter" if isinstance(tensor, nn.Parameter) else "buffer",
     )
     placeholder_metadata.extend(
-        PlaceholderMetadata(
-            name=name,
-            role="optimizer_state",
-            shape=getattr(state, "shape", None),
-            dtype=getattr(state, "dtype", None),
-            requires_grad=bool(getattr(state, "requires_grad", False)),
+        _placeholder_metadata_for_flattened_tree(
+            named_states,
+            lambda _name, _tensor: "optimizer_state",
         )
-        for name, state in named_states.items()
     )
 
     # Remove helper-only graph artifacts. detach nodes do not affect this

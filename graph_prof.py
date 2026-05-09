@@ -592,8 +592,8 @@ class GraphProfiler(fx.Interpreter):
             )
 
     def export_summary(self, output_path: str | Path) -> Path:
-        # Persist the profiler artifact so the demo app and reports can inspect
-        # the run without rerunning model training.
+        # Persist the profiler artifact so reports can inspect the run without
+        # rerunning model training.
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         summary = self.latest_summary or self.build_summary()

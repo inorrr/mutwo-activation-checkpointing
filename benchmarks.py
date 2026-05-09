@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
@@ -26,7 +26,7 @@ from activation_checkpoint import (
     ActivationCheckpointPlan,
     activation_checkpointing,
 )
-from graph_prof import GraphProfiler, ProfilerSummary
+from graph_prof import GraphProfiler
 from graph_tracer import SEPFunction, compile
 
 
@@ -47,7 +47,6 @@ class RunResult:
     correctness_ok: Optional[bool]
     output_dir: str
     profiler_summary_path: str
-    profiler_breakdown_plot: str
     plan_path: Optional[str] = None
     rewritten_profiler_summary_path: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -61,6 +60,7 @@ class SweepResult:
     output_dir: str
     memory_plot: str
     latency_plot: str
+    breakdown_plot: Optional[str] = None
 
 
 def _device() -> torch.device:
@@ -215,24 +215,6 @@ class Experiment:
             return self._make_resnet_batch(self.batch_size)
         return self._make_bert_batch(self.batch_size)
 
-    def _plot_peak_memory_breakdown(self, summary: ProfilerSummary, output_path: Path) -> Path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        labels = ["Parameters", "Gradients", "Optimizer", "Activations"]
-        values = [
-            summary.peak_breakdown_bytes["parameter_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["gradient_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["optimizer_state_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["activation_bytes"] / (1024**2),
-        ]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.bar(labels, values, color=["#365c8d", "#4ac16d", "#d08c60", "#b33f62"])
-        ax.set_ylabel("Memory (MB)")
-        ax.set_title(f"Peak Memory Breakdown: {self.model_name} (bs={self.batch_size})")
-        fig.tight_layout()
-        fig.savefig(output_path)
-        plt.close(fig)
-        return output_path
-
     def _write_json(self, payload: Dict[str, Any], path: Path) -> Path:
         # Centralized JSON writer for plan/manifest/error artifacts.
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -329,13 +311,9 @@ class Experiment:
             profiler.aggregate_stats()
             summary = profiler.latest_summary or profiler.build_summary()
             summary_path = profiler.export_summary(artifacts_dir / "profiler_summary.json")
-            breakdown_path = self._plot_peak_memory_breakdown(
-                summary, artifacts_dir / "peak_memory_breakdown.png"
-            )
             capture["profiler"] = profiler
             capture["summary"] = summary
             capture["summary_path"] = summary_path
-            capture["breakdown_path"] = breakdown_path
             capture["flat_args"] = args
             gm._ac_run_with_interpreter = True
 
@@ -403,7 +381,6 @@ class Experiment:
             correctness_ok=capture.get("correctness_ok"),
             output_dir=str(artifacts_dir),
             profiler_summary_path=str(capture["summary_path"]),
-            profiler_breakdown_plot=str(capture["breakdown_path"]),
             plan_path=str(capture["plan_path"]) if "plan_path" in capture else None,
             rewritten_profiler_summary_path=(
                 str(capture["rewritten_summary_path"])
@@ -500,6 +477,105 @@ def _plot_sweep(
     return output_path
 
 
+def _load_peak_breakdown(run: RunResult) -> Dict[str, float]:
+    # AC runs prefer the rewritten graph summary when available because that is
+    # the artifact that reflects recomputation after graph mutation.
+    summary_path = (
+        run.rewritten_profiler_summary_path
+        if run.use_activation_checkpointing and run.rewritten_profiler_summary_path
+        else run.profiler_summary_path
+    )
+    payload = json.loads(Path(summary_path).read_text(encoding="utf-8"))
+    breakdown = payload["peak_breakdown_bytes"]
+    return {
+        "Parameters": breakdown.get("parameter_bytes", 0) / (1024**2),
+        "Gradients": breakdown.get("gradient_bytes", 0) / (1024**2),
+        "Optimizer": breakdown.get("optimizer_state_bytes", 0) / (1024**2),
+        "Activations": breakdown.get("activation_bytes", 0) / (1024**2),
+    }
+
+
+def _plot_peak_memory_breakdown_sweep(
+    runs: List[RunResult],
+    model_name: str,
+    output_path: Path,
+) -> Path:
+    # One stacked chart makes it easier to compare baseline and AC across batch
+    # sizes than separate per-run breakdown images.
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    batch_sizes = sorted({run.batch_size for run in runs})
+    run_by_key = {
+        (run.batch_size, run.use_activation_checkpointing): run for run in runs
+    }
+    categories = ["Parameters", "Gradients", "Optimizer", "Activations"]
+    colors = {
+        "Parameters": "#365c8d",
+        "Gradients": "#4ac16d",
+        "Optimizer": "#d08c60",
+        "Activations": "#b33f62",
+    }
+    fig, ax = plt.subplots(figsize=(max(7, 1.8 * len(batch_sizes)), 4.5))
+    width = 0.36
+    x_positions = list(range(len(batch_sizes)))
+    mode_specs = [
+        (False, "Baseline", -width / 2),
+        (True, "AC", width / 2),
+    ]
+    legend_seen: Set[str] = set()
+
+    for use_ac, mode_label, offset in mode_specs:
+        xs = [pos + offset for pos in x_positions]
+        bottoms = [0.0 for _ in batch_sizes]
+        values_by_category = {category: [] for category in categories}
+        for batch_size in batch_sizes:
+            run = run_by_key.get((batch_size, use_ac))
+            breakdown = (
+                _load_peak_breakdown(run)
+                if run is not None
+                else {category: 0.0 for category in categories}
+            )
+            for category in categories:
+                values_by_category[category].append(breakdown[category])
+
+        for category in categories:
+            label = category if category not in legend_seen else None
+            ax.bar(
+                xs,
+                values_by_category[category],
+                width=width,
+                bottom=bottoms,
+                color=colors[category],
+                label=label,
+            )
+            legend_seen.add(category)
+            bottoms = [
+                bottom + value
+                for bottom, value in zip(bottoms, values_by_category[category])
+            ]
+
+        for x, total in zip(xs, bottoms):
+            ax.text(
+                x,
+                total,
+                mode_label,
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                rotation=0,
+            )
+
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels([str(batch_size) for batch_size in batch_sizes])
+    ax.set_xlabel("Batch size")
+    ax.set_ylabel("Modeled peak memory (MB)")
+    ax.set_title(f"Peak Memory Breakdown by Batch Size: {model_name}")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+    return output_path
+
+
 def run_sweep(
     model_name: str,
     batch_sizes: List[int],
@@ -559,7 +635,7 @@ def run_sweep(
     ]
     _write_csv(rows, output_dir / "sweep_results.csv")
 
-    # Standard plot artifacts used by the report and Streamlit app.
+    # Standard plot artifacts used by the report.
     memory_plot = _plot_sweep(
         runs,
         metric="peak_memory_bytes_max",
@@ -574,6 +650,11 @@ def run_sweep(
         title=f"Iteration Latency vs Batch Size: {model_name}",
         output_path=output_dir / "latency_vs_batch_size.png",
     )
+    breakdown_plot = _plot_peak_memory_breakdown_sweep(
+        runs,
+        model_name=model_name,
+        output_path=output_dir / "peak_memory_breakdown_stacked.png",
+    )
 
     manifest = {
         "model_name": model_name,
@@ -581,6 +662,7 @@ def run_sweep(
         "runs": [asdict(run) for run in runs],
         "memory_plot": str(memory_plot),
         "latency_plot": str(latency_plot),
+        "breakdown_plot": str(breakdown_plot),
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, default=_json_default), encoding="utf-8"
@@ -592,6 +674,7 @@ def run_sweep(
         output_dir=str(output_dir),
         memory_plot=str(memory_plot),
         latency_plot=str(latency_plot),
+        breakdown_plot=str(breakdown_plot),
     )
 
 

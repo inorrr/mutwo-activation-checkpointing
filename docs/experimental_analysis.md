@@ -1,193 +1,178 @@
 # Experimental Analysis
 
-This document summarizes the current experimental artifacts saved under [outputs/final_runs_multi](/C:/Users/inorz/OneDrive/Documents/Harvard/mutwo-activation-checkpointing/outputs/final_runs_multi).
+This document summarizes the current experimental artifacts saved under [outputs/final_runs_multi](../outputs/final_runs_multi).
 
-The final saved sweeps use:
+The saved sweeps use:
 
 - `ResNet-152`, mini-batch sizes `1`, `2`, `4`, `6`, and `8`, input image size `320 x 320`
-- `BERT`, mini-batch sizes `1`, `2`, and `4`, sequence length `512`, vocabulary size `4096`, full non-debug BERT configuration
+- `BERT`, mini-batch sizes `1`, `2`, `4`, `6`, and `8`, sequence length `512`, vocabulary size `4096`, full non-debug BERT configuration
 
-The plots, CSV files, profiler summaries, checkpoint plans, and rewritten-profiler summaries were generated for these settings. Activation-checkpointed measurements execute the custom FX graph rewrite path.
+Each batch size has a baseline run and an activation-checkpointed run. The activation-checkpointed runs execute the custom FX graph rewrite path, not PyTorch's built-in module-level checkpoint wrapper.
 
 ## Design Choices
 
-The project uses the PyTorch FX workflow for graph capture, static activation-lifetime analysis, checkpoint-plan export, graph rewriting, and benchmark measurement. Activation-checkpointed benchmark runs execute the custom rewritten FX graph produced by the project extractor/rewriter rather than delegating to framework-level checkpointing helpers.
+The project uses PyTorch FX to capture a full training step, profile the graph, estimate activation lifetimes, choose recomputation candidates, and rewrite the graph. The same compiled measurement path is used for baseline and activation-checkpointed runs.
 
 The final implementation uses:
 
-- FX profiling and checkpoint planning for inspection artifacts.
-- Custom FX subgraph extraction and rewriting for activation-checkpointed execution.
-- The same compiled measurement path for baseline and activation-checkpointed runs.
-- A checkpoint policy with `0.25 MB` minimum estimated savings per activation, a recompute budget up to `1.0x` measured forward-pass time, and a candidate limit tuned per model in the final runs.
-- CUDA cache/peak-stat cleanup before measurement.
-- Profiler cleanup so `GraphProfiler` does not retain runtime tensors after profiling.
+- FX tracing of the full training step, including forward, backward, and optimizer update.
+- `GraphProfiler` for node-level timing, activation-lifetime analysis, and memory-breakdown artifacts.
+- A recompute-only checkpoint planner inspired by the Mutwo policy.
+- Custom FX subgraph extraction and graph rewriting for selected activation recomputation.
+- Correct optimizer-state accounting in the memory breakdown, including Adam state tensors such as `exp_avg` and `exp_avg_sq`.
+- A sweep-level stacked memory-breakdown plot instead of per-run breakdown plots.
 
-The custom checkpoint planner uses a simplified, recompute-only version of the Mutwo policy from the MLSys 2023 paper. The full Mutwo system combines multi-model scheduling, activation swapping, and activation recomputation. This project only rewrites recomputation candidates, so the implemented subset does the following:
+The benchmark CLI default checkpoint policy is:
 
-- Builds recomputation candidates from profiled activation size, lifetime, and estimated recompute cost.
-- Models the inactive interval between an activation's last forward use and its first backward use.
-- Scores recomputation candidates by memory saved per recompute cost, with inactive time and size as tie breakers.
+```text
+memory_budget_mb = None
+min_savings_mb = 0.25
+max_recompute_ratio = 1.0
+min_recompute_budget_ms = 1.0
+max_candidates = 8
+prefer_peak_overlap = True
+exclude_view_like_ops = True
+```
+
+The saved final sweeps use different candidate limits by model:
+
+- ResNet-152 uses `--max-candidates 16` to show a clearer checkpointing effect across the image batch-size sweep.
+- BERT uses the CLI default `--max-candidates 8` because `16` candidates caused OOM at larger batch sizes such as `6` and `8` during the custom FX rewrite/profiling path.
+
+The planner:
+
+- Builds candidates from profiled activation size, lifetime, and recompute cost.
 - Prioritizes activations that overlap the modeled peak live set.
-- Iteratively simulates total peak memory after each recompute decision and stops when the configured memory budget, candidate limit, or recompute-cost limit is reached.
+- Scores candidates by memory saved per recompute cost, with inactive time and tensor size as tie breakers.
+- Skips view-like or alias-like candidates such as `view`, `transpose`, `expand`, and `getitem`.
+- Greedily selects up to the configured candidate limit while respecting the recompute budget.
 
-The planner avoids spending checkpoint slots on view-like or alias-like candidates such as `t`, `view`, `transpose`, `expand`, and `getitem`. Those tensors can appear large from shape alone, but often do not own new CUDA storage, so recomputing them rarely reduces allocator peak memory.
+## Implementation Limitations
 
-For BERT, the benchmark uses `vocab_size=4096`. This keeps the language-modeling head from dominating memory and makes transformer activations easier to inspect. The benchmark also uses `seq_len=512`, which makes transformer activations large enough for checkpointing effects to be visible at larger batch sizes.
-
-### Implementation Limitations
-
-The implementation intentionally stays close to the course project requirement: it profiles an FX graph, chooses activation tensors, extracts the subgraphs that produce those tensors, and inserts recomputation nodes into the backward region. It checkpoints selected graph values rather than wrapping whole modules.
+The implementation checkpoints selected FX activation values rather than whole ResNet blocks or BERT transformer layers. That design is useful for demonstrating graph-level profiling and rewriting, but it is less aggressive than production activation checkpointing, which often wraps entire modules.
 
 The main limitations are:
 
-- The planner checkpoints individual FX activation values, not whole ResNet residual blocks or BERT transformer layers. This gives fine-grained validation of the graph rewrite, but it saves less allocator-level memory than block-level checkpointing.
-- The peak-memory model is static and tensor-lifetime based. Actual CUDA peak memory also includes parameters, gradients, optimizer state, temporary kernel workspaces, cloned recomputation outputs, allocator fragmentation, and PyTorch caching behavior.
-- The implementation is recompute-only. It does not implement Mutwo's broader activation swapping/offloading or multi-job scheduling components.
-- The rewrite preserves correctness but may duplicate small producer chains many times. More aggressive candidate counts can improve savings, but they can also increase temporary memory and execution overhead.
-- BERT batch sizes `6` and `8` were not included in the final BERT sweep because aggressive custom-FX rewrites at those settings can exceed the available 8 GB GPU during profiling of the rewritten graph. The saved BERT sweep therefore uses batch sizes `1`, `2`, and `4`.
-- The benchmark uses only a few timed iterations, so latency should be treated as a coarse signal rather than a stable microbenchmark.
+- The peak-memory model is static and tensor-lifetime based. CUDA peak memory also depends on temporary kernel workspaces, allocator caching, fragmentation, and cloned recomputation outputs.
+- The implementation is recompute-only. It does not implement Mutwo's activation swapping/offloading or multi-job scheduling.
+- The planner has a conservative candidate cap of `8` in the benchmark CLI. Increasing this can improve savings but may also increase recomputation overhead or cause OOM at larger BERT batch sizes.
+- BERT memory is spread across many transformer operations. Individual-node recomputation reduces some activation lifetimes, but it does not drop a whole transformer's intermediate footprint the way block-level checkpointing would.
+- Only three measured iterations are used per run, so latency should be interpreted as a coarse signal rather than a stable microbenchmark.
 
-## A. Computation And Memory Profiling Statistics And Static Analysis
+## A. Static Profiling And Memory Breakdown
 
-### ResNet-152
+The stacked plots below compare modeled peak memory composition for baseline and activation-checkpointed runs. The AC bars use each run's rewritten-profiler summary, so the activation slice reflects the graph after recomputation nodes were inserted.
 
-Runtime summary at batch size `1`:
+ResNet-152 stacked memory breakdown:
 
-| Mode | Avg latency (ms) | Peak GPU memory (MB) | Correctness check |
-| --- | ---: | ---: | --- |
-| Baseline | 275.97 | 1196.37 | N/A |
-| With AC | 318.15 | 1206.87 | Passed |
+![ResNet-152 stacked memory breakdown](../outputs/final_runs_multi/ResNet-152/peak_memory_breakdown_stacked.png)
 
-Static memory breakdown from the batch-size-1 baseline profiler summary:
+BERT stacked memory breakdown:
 
-| Component | Peak memory (MB) |
-| --- | ---: |
-| Parameters | 229.62 |
-| Gradients | 229.62 |
-| Optimizer state | 0.00 |
-| Activations | 352.54 |
-| Total traced peak | 811.78 |
+![BERT stacked memory breakdown](../outputs/final_runs_multi/BERT/peak_memory_breakdown_stacked.png)
 
-Static-analysis summary:
+### ResNet-152 Static Breakdown
 
-- Activation candidates identified: `778`
-- The largest apparent candidate was `t` with shape `[2048, 1000]` and size `7.81 MB`
-- The largest materialized feature-map candidates include tensors with shape `[1, 256, 80, 80]` and size `6.25 MB`
-- The simplified Mutwo recompute policy selected `16` activations for recomputation in the batch-size-1 saved plan.
-- Estimated saved activation bytes from the batch-size-1 plan: approximately `75.00 MB`
-- Estimated static traced peak after the recompute plan: approximately `736.78 MB`
+At batch size `1`, the baseline profiler reports:
 
-Largest baseline activation candidates:
+| Component | Baseline MB | AC rewritten MB |
+| --- | ---: | ---: |
+| Parameters | 229.62 | 229.62 |
+| Gradients | 229.62 | 229.62 |
+| Optimizer state | 459.24 | 459.24 |
+| Activations | 352.54 | 305.67 |
 
-| Activation | Shape | Size (MB) | First backward user |
-| --- | --- | ---: | --- |
-| `t` | `[2048, 1000]` | 7.81 | `t_1` |
-| `relu__9` | `[1, 256, 80, 80]` | 6.25 | `convolution_backward_140` |
-| `convolution_3` | `[1, 256, 80, 80]` | 6.25 | `cudnn_batch_norm_backward_151` |
-| `convolution_7` | `[1, 256, 80, 80]` | 6.25 | `cudnn_batch_norm_backward_147` |
-| `convolution_4` | `[1, 256, 80, 80]` | 6.25 | `cudnn_batch_norm_backward_150` |
+At batch size `8`, the profiler reports:
 
-Peak-memory breakdown plot:
+| Component | Baseline MB | AC rewritten MB |
+| --- | ---: | ---: |
+| Parameters | 229.62 | 229.62 |
+| Gradients | 229.62 | 229.62 |
+| Optimizer state | 459.24 | 459.24 |
+| Activations | 2761.61 | 2561.61 |
 
-![ResNet-152 baseline peak memory breakdown](../outputs/final_runs_multi/ResNet-152/bs_1/baseline/peak_memory_breakdown.png)
+ResNet plan summary:
 
-### BERT
-
-Runtime summary at batch size `1`:
-
-| Mode | Avg latency (ms) | Peak GPU memory (MB) | Correctness check |
-| --- | ---: | ---: | --- |
-| Baseline | 177.23 | 1718.10 | N/A |
-| With AC | 164.43 | 1718.60 | Passed |
-
-Static memory breakdown from the batch-size-1 baseline profiler summary:
-
-| Component | Peak memory (MB) |
-| --- | ---: |
-| Parameters | 352.26 |
-| Gradients | 352.26 |
-| Optimizer state | 0.00 |
-| Activations | 849.52 |
-| Total traced peak | 1554.04 |
-
-Static-analysis summary:
-
-- Activation candidates identified: `366`
-- The largest apparent candidates are expanded attention masks with shape `[1, 12, 512, 512]` and size `12.00 MB`
-- Several projection matrices with shapes `[768, 4096]`, `[768, 3072]`, and `[3072, 768]` also appear as large recomputable candidates
-- The batch-size-1 plan selected `16` activations for recomputation.
-- Estimated saved activation bytes from the batch-size-1 plan: approximately `30.50 MB`
-- Estimated static traced peak after the recompute plan: approximately `1531.54 MB`
-
-Largest baseline activation candidates:
-
-| Activation | Shape | Size (MB) | First backward user |
-| --- | --- | ---: | --- |
-| `expand_9` | `[1, 12, 512, 512]` | 12.00 | `_scaled_dot_product_efficient_attention_backward_5` |
-| `expand_12` | `[1, 12, 512, 512]` | 12.00 | `_scaled_dot_product_efficient_attention_backward_2` |
-| `expand_11` | `[1, 12, 512, 512]` | 12.00 | `_scaled_dot_product_efficient_attention_backward_3` |
-| `expand_5` | `[1, 12, 512, 512]` | 12.00 | `_scaled_dot_product_efficient_attention_backward_9` |
-| `expand_3` | `[1, 12, 512, 512]` | 12.00 | `_scaled_dot_product_efficient_attention_backward_11` |
-
-Peak-memory breakdown plot:
-
-![BERT baseline peak memory breakdown](../outputs/final_runs_multi/BERT/bs_1/baseline/peak_memory_breakdown.png)
-
-### Interpretation
-
-- The FX profiler continues to separate forward, backward, and optimizer regions and produce activation-lifetime data for checkpoint planning.
-- Runtime measurements execute the custom rewritten FX graph for AC runs.
-- ResNet shows visible peak-memory reductions for batch sizes `2`, `4`, `6`, and `8`; batch size `1` is slightly above baseline due to recompute-node overhead and allocator effects.
-- BERT shows a clear reduction at batch size `4`, but batch sizes `1` and `2` are close to flat or slightly above baseline.
-- Correctness checks passed for all AC-enabled saved runs.
-
-### Why Peak-Memory Reduction Is Modest
-
-The peak-memory reductions are real but modest because this project checkpoints selected FX activation tensors rather than entire high-level modules.
-
-For ResNet, the selected tensors are mostly convolution and ReLU feature maps. Those feature maps grow with image and batch size, so the memory savings become visible once batch size reaches `2`. The batch-size-4 plan, for example, recomputes `16` activations and estimates about `206.25 MB` of activation savings. However, the measured CUDA peak only falls by about `9.92%` because parameters, gradients, optimizer state, temporary convolution workspaces, and allocator behavior still contribute to the peak.
-
-For BERT, the reduction is smaller for several reasons:
-
-- BERT has large fixed model, gradient, optimizer, and language-model-head memory. At batch sizes `1` and `2`, that fixed memory dominates the allocator peak, so removing selected activations barely changes total peak memory.
-- Many apparent large tensors in BERT are view-like or alias-like attention-mask tensors such as `expand`. The planner intentionally skips those because recomputing them usually does not release real CUDA storage.
-- The selected BERT activations are often elementwise outputs such as `add`, `gelu`, and `_log_softmax`. They are correct recomputation targets, but they do not capture the whole transformer-layer activation footprint the way module-level checkpointing would.
-- Recomputed subgraphs can introduce temporary tensors during backward. At small batch sizes, those recomputation temporaries and allocator effects can offset the saved retained activations.
-
-This is why BERT batch size `4` shows a meaningful reduction (`4.44%`), while batch sizes `1` and `2` do not.
-
-## B. Peak Memory Consumption Vs Mini-Batch Size Bar Graph
-
-ResNet-152 sweep bar graph:
-
-![ResNet-152 peak memory vs batch size](../outputs/final_runs_multi/ResNet-152/peak_memory_vs_batch_size.png)
-
-BERT sweep bar graph:
-
-![BERT peak memory vs batch size](../outputs/final_runs_multi/BERT/peak_memory_vs_batch_size.png)
-
-The peak-memory plots were also generated directly from the saved CSV files:
-
-![Combined peak memory vs batch size from CSV](../outputs/final_runs_multi/peak_memory_vs_batch_size_combined_from_csv.png)
-
-Observed values from the saved multi-batch runs:
-
-| Model | Batch size | Baseline peak memory (MB) | AC peak memory (MB) | Reduction |
-| --- | ---: | ---: | ---: | ---: |
-| ResNet-152 | 1 | 1196.37 | 1206.87 | -0.88% |
-| ResNet-152 | 2 | 1470.85 | 1357.47 | 7.71% |
-| ResNet-152 | 4 | 2173.58 | 1957.96 | 9.92% |
-| ResNet-152 | 6 | 2853.26 | 2660.66 | 6.75% |
-| ResNet-152 | 8 | 3546.12 | 3252.21 | 8.29% |
-| BERT | 1 | 1718.10 | 1718.60 | -0.03% |
-| BERT | 2 | 1733.62 | 1745.62 | -0.69% |
-| BERT | 4 | 2419.96 | 2312.46 | 4.44% |
+| Batch size | Recomputed activations | Estimated saved activation MB | Estimated planned peak MB |
+| ---: | ---: | ---: | ---: |
+| 1 | 8 | 46.88 | 1224.14 |
+| 2 | 8 | 65.63 | 1549.54 |
+| 4 | 8 | 93.75 | 2209.72 |
+| 6 | 8 | 121.88 | 2869.90 |
+| 8 | 8 | 200.00 | 3480.08 |
 
 Interpretation:
 
-- ResNet shows meaningful memory savings once batch size is at least `2`, with reductions between `6.75%` and `9.92%` in the custom-FX runs.
-- BERT remains close to flat at smaller batch sizes: batch size `4` shows a clear reduction, while `1` and `2` are slightly above baseline.
-- The small negative reductions are within the range of fixed overhead and allocator behavior for this custom graph-execution path; the profiler still records recomputation plans and all AC correctness checks pass.
+- ResNet activation memory grows strongly with batch size because feature-map tensors scale with the image batch.
+- The AC rewritten summaries show lower activation memory at every batch size.
+- Fixed memory from parameters, gradients, and Adam optimizer state remains unchanged, so total memory falls less than activation memory alone.
+
+### BERT Static Breakdown
+
+At batch size `1`, the baseline profiler reports:
+
+| Component | Baseline MB | AC rewritten MB |
+| --- | ---: | ---: |
+| Parameters | 352.26 | 352.26 |
+| Gradients | 352.26 | 352.26 |
+| Optimizer state | 704.52 | 704.52 |
+| Activations | 849.52 | 831.02 |
+
+At batch size `8`, the profiler reports:
+
+| Component | Baseline MB | AC rewritten MB |
+| --- | ---: | ---: |
+| Parameters | 352.26 | 352.26 |
+| Gradients | 352.26 | 352.26 |
+| Optimizer state | 704.52 | 704.52 |
+| Activations | 4428.38 | 4280.38 |
+
+BERT plan summary:
+
+| Batch size | Recomputed activations | Estimated saved activation MB | Estimated planned peak MB |
+| ---: | ---: | ---: | ---: |
+| 1 | 8 | 18.50 | 2248.06 |
+| 2 | 8 | 37.00 | 2748.82 |
+| 4 | 8 | 74.00 | 3750.35 |
+| 6 | 8 | 111.00 | 4751.88 |
+| 8 | 8 | 148.00 | 5753.42 |
+
+Interpretation:
+
+- BERT activation memory is reduced, but the reduction is modest because only eight individual FX activation values are checkpointed.
+- The planner intentionally skips many view-like attention tensors, which can be large by shape but may not own meaningful allocator storage.
+- A block-level transformer checkpointing strategy would likely show a larger activation-memory drop, but that is outside this project's current fine-grained FX rewrite design.
+
+## B. Peak Memory Consumption Vs Mini-Batch Size
+
+ResNet-152 peak memory plot:
+
+![ResNet-152 peak memory vs batch size](../outputs/final_runs_multi/ResNet-152/peak_memory_vs_batch_size.png)
+
+BERT peak memory plot:
+
+![BERT peak memory vs batch size](../outputs/final_runs_multi/BERT/peak_memory_vs_batch_size.png)
+
+Observed peak GPU memory:
+
+| Model | Batch size | Baseline MB | AC MB | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| ResNet-152 | 1 | 1196.37 | 1212.18 | -1.32% |
+| ResNet-152 | 2 | 1470.85 | 1410.79 | 4.08% |
+| ResNet-152 | 4 | 2173.71 | 2076.08 | 4.49% |
+| ResNet-152 | 6 | 2852.44 | 2738.07 | 4.01% |
+| ResNet-152 | 8 | 3549.62 | 3350.90 | 5.60% |
+| BERT | 1 | 1718.10 | 1715.35 | 0.16% |
+| BERT | 2 | 1733.62 | 1744.87 | -0.65% |
+| BERT | 4 | 2417.96 | 2360.21 | 2.39% |
+| BERT | 6 | 3081.90 | 3022.53 | 1.93% |
+| BERT | 8 | 3766.46 | 3728.09 | 1.02% |
+
+Interpretation:
+
+- ResNet shows consistent memory reduction once batch size is at least `2`. Batch size `1` is slightly worse because the saved activation memory is small compared with rewrite and allocator effects.
+- BERT reductions are smaller. The current planner shortens the lifetime of selected activations, but it does not remove enough of the transformer's peak live activation set to create a large total-memory drop.
+- Optimizer memory is now correctly counted. Since Adam state is fixed with respect to batch size, it makes the total-memory reduction percentage look smaller than activation-only savings.
 
 ## C. Iteration Latency Vs Mini-Batch Size
 
@@ -199,46 +184,35 @@ BERT latency plot:
 
 ![BERT latency vs batch size](../outputs/final_runs_multi/BERT/latency_vs_batch_size.png)
 
-Observed values from the saved multi-batch runs:
+Observed latency:
 
-| Model | Batch size | Baseline latency (ms) | AC latency (ms) |
+| Model | Batch size | Baseline ms | AC ms |
 | --- | ---: | ---: | ---: |
-| ResNet-152 | 1 | 275.97 | 318.15 |
-| ResNet-152 | 2 | 368.47 | 474.47 |
-| ResNet-152 | 4 | 350.66 | 322.27 |
-| ResNet-152 | 6 | 450.58 | 410.08 |
-| ResNet-152 | 8 | 439.32 | 439.33 |
-| BERT | 1 | 177.23 | 164.43 |
-| BERT | 2 | 251.02 | 265.41 |
-| BERT | 4 | 388.00 | 375.07 |
+| ResNet-152 | 1 | 355.31 | 325.90 |
+| ResNet-152 | 2 | 309.75 | 292.70 |
+| ResNet-152 | 4 | 343.90 | 314.19 |
+| ResNet-152 | 6 | 437.84 | 412.92 |
+| ResNet-152 | 8 | 471.02 | 505.32 |
+| BERT | 1 | 174.94 | 176.65 |
+| BERT | 2 | 239.03 | 271.39 |
+| BERT | 4 | 356.38 | 398.11 |
+| BERT | 6 | 511.98 | 1162.69 |
+| BERT | 8 | 1380.26 | 684.32 |
 
 Interpretation:
 
-- Activation checkpointing trades compute for memory by recomputing selected activations during backward.
-- ResNet pays visible overhead at batch sizes `1` and `2`, is roughly tied at `8`, and is faster at `4` and `6` in this run; those faster AC points should be treated as measurement noise or allocator/cache effects rather than a general checkpointing speedup.
-- BERT latency is also mixed: AC is faster at batch sizes `1` and `4`, but slower at `2`.
-- Longer runs with more iterations would give smoother latency estimates, but the plots are sufficient to show the measured behavior of the custom FX rewrite path.
-
-### Why AC Latency Is Not Consistently Higher
-
-In principle, activation checkpointing should add compute because discarded activations must be recomputed during backward. The measured latency is not consistently higher because the benchmark is not a controlled kernel-level timing study:
-
-- Only three timed iterations are used per run, so run-to-run variance can be comparable to the recompute overhead.
-- CUDA kernel selection, warmup behavior, allocator cache state, and temporary workspace reuse can shift timings by tens of milliseconds.
-- The baseline and rewritten graphs can have different memory pressure. In some runs, lower memory pressure or different allocation order may offset some recompute cost.
-- The FX interpreter path and cloned graph structure introduce overhead that is not identical across baseline and AC graphs.
-- GPU background activity and asynchronous CUDA execution can add noise even with explicit synchronization around measured iterations.
-
-Therefore, the latency results should be read as showing that the custom AC path remains in the same broad performance regime, not as evidence that checkpointing generally accelerates training.
+- Activation checkpointing normally trades compute for memory because discarded activations are recomputed during backward.
+- The measured latency is noisy because each point uses only a few timed iterations and the custom FX interpreter/rewrite path can interact with CUDA allocation, kernel warmup, and cache state.
+- The BERT batch-size-6 and batch-size-8 latency points have high variance and should not be overinterpreted as stable speedups or slowdowns.
+- The key result is that correctness checks passed for all AC runs and memory is reduced in most measured settings, while latency remains in the same broad regime except for noisy larger-BERT points.
 
 ## Reproduction
 
-The plots and summaries were generated from:
+The current final artifacts were generated with:
 
 ```powershell
-conda run -n cs265 python benchmarks.py --model "ResNet-152" --batch-sizes 1 2 4 6 8 --image-size 320 --output-dir outputs/final_runs_multi
-conda run -n cs265 python benchmarks.py --model "BERT" --batch-sizes 1 2 4 --seq-len 512 --vocab-size 4096 --max-candidates 16 --output-dir outputs/final_runs_multi
-conda run -n cs265 python plot_previous_peak_memory.py
+conda run -n cs265 python benchmarks.py --model ResNet-152 --batch-sizes 1 2 4 6 8 --image-size 320 --max-candidates 16 --output-dir outputs/final_runs_multi
+conda run -n cs265 python benchmarks.py --model BERT --batch-sizes 1 2 4 6 8 --seq-len 512 --vocab-size 4096 --output-dir outputs/final_runs_multi
 ```
 
 The validation tests were run with:
