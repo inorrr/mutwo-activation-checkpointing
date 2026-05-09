@@ -13,6 +13,7 @@ from graph_prof import GraphProfiler
 from graph_tracer import SEPFunction, compile
 
 
+# Small toy network used to exercise the full tracing/profiling/rewrite path
 class DummyModel(nn.Module):
     def __init__(self, layers: int, dim: int):
         super().__init__()
@@ -25,16 +26,19 @@ class DummyModel(nn.Module):
         return self.mod(x)
 
 
+# training iteration
 def train_step(
     model: torch.nn.Module, optim: torch.optim.Optimizer, batch: torch.Tensor
 ) -> None:
-    loss = model(batch).sum()
-    loss = SEPFunction.apply(loss)
+    loss = model(batch).sum() #run
+    loss = SEPFunction.apply(loss) #seperator
     loss.backward()
-    optim.step()
-    optim.zero_grad()
+    optim.step() # update parameters with grad
+    optim.zero_grad() # clear!
 
 
+# Build the callback that is invoked once the training step has been traced into
+# an FX GraphModule. The callback profiles the graph and optionally rewrites it.
 def graph_transformation_factory(
     output_dir: Path,
     use_activation_checkpointing: bool,
@@ -43,6 +47,7 @@ def graph_transformation_factory(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     def transform(gm: fx.GraphModule, args: Any) -> fx.GraphModule:
+        # run traced graph through the profiler
         profiler = GraphProfiler(gm)
         with torch.no_grad():
             for _ in range(2):
@@ -50,11 +55,14 @@ def graph_transformation_factory(
         profiler.aggregate_stats()
         profiler.export_summary(output_dir / "profiler_summary.json")
         profiler.print_stats(limit=10)
+        # The rewritten graphs produced here are safest to execute through the
+        # FX interpreter because they may contain cloned nodes inserted by hand.
         gm._ac_run_with_interpreter = True
 
         if not use_activation_checkpointing:
             return gm
 
+        # Build a recompute plan
         rewritten_gm, plan = activation_checkpointing(gm, profiler, checkpoint_config)
         (output_dir / "checkpoint_plan.json").write_text(
             str(asdict(plan)), encoding="utf-8"
@@ -71,6 +79,7 @@ def experiment(
     memory_budget_mb: float | None = None,
 ):
     logging.getLogger().setLevel(logging.INFO)
+
     torch.manual_seed(20)
     batch_size = 1000
     layers = 10
@@ -79,6 +88,7 @@ def experiment(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = DummyModel(dim=dim, layers=layers).to(device)
     batch = torch.randn(batch_size, dim, device=device)
+    # Adam on CUDA needs capturable=True when the optimizer step is traced.
     optimizer_kwargs = {"capturable": True} if device.type == "cuda" else {}
     optim = torch.optim.Adam(model.parameters(), lr=0.01, foreach=True, **optimizer_kwargs)
 

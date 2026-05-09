@@ -3,8 +3,12 @@
     "recompute": [
       "gelu_12",
       "add_1",
+      "_log_softmax",
       "add_26",
-      "add_22"
+      "add_22",
+      "add_10",
+      "add_18",
+      "add_14"
     ],
     "retain": [
       "slice_1",
@@ -116,7 +120,6 @@
       "view_58",
       "t_21",
       "getitem_52",
-      "add_10",
       "getitem_54",
       "getitem_55",
       "view_60",
@@ -174,7 +177,6 @@
       "view_90",
       "t_33",
       "getitem_80",
-      "add_14",
       "getitem_82",
       "getitem_83",
       "view_92",
@@ -232,7 +234,6 @@
       "view_122",
       "t_45",
       "getitem_108",
-      "add_18",
       "getitem_110",
       "getitem_111",
       "view_124",
@@ -366,7 +367,6 @@
       "view_194",
       "t_73",
       "view_197",
-      "_log_softmax",
       "getitem_177",
       "ones_like"
     ],
@@ -710,38 +710,40 @@
       "view_197": "below_min_savings",
       "getitem_177": "below_min_savings",
       "ones_like": "below_min_savings",
-      "add_18": "candidate_limit",
+      "add_8": "candidate_limit",
+      "add_12": "candidate_limit",
       "add_24": "candidate_limit",
       "add_16": "candidate_limit",
-      "add_20": "candidate_limit",
-      "add_14": "candidate_limit",
-      "add_10": "candidate_limit",
-      "add_12": "candidate_limit",
-      "add_8": "candidate_limit",
       "add_6": "candidate_limit",
+      "add_20": "candidate_limit",
       "add_4": "candidate_limit",
       "add_25": "candidate_limit",
-      "add_27": "candidate_limit",
       "add_23": "candidate_limit",
-      "add_17": "candidate_limit",
+      "add_27": "candidate_limit",
       "add_21": "candidate_limit",
       "add_19": "candidate_limit",
-      "add_13": "candidate_limit",
+      "add_17": "candidate_limit",
       "add_15": "candidate_limit",
-      "add_9": "candidate_limit",
       "add_11": "candidate_limit",
-      "_log_softmax": "candidate_limit",
+      "add_9": "candidate_limit",
+      "add_13": "candidate_limit",
       "add_5": "candidate_limit",
       "add_7": "candidate_limit"
     },
-    "estimated_saved_bytes": 25165824,
-    "estimated_peak_bytes": 3212662984,
+    "estimated_saved_bytes": 77594624,
+    "estimated_peak_bytes": 3932529648,
     "metadata": {
       "algorithm": "mutwo_simplified_recompute_only",
-      "initial_peak_bytes": 3237828808,
+      "initial_peak_bytes": 3976569848,
       "memory_limit_bytes": null,
-      "allowed_recompute_ms": 127.7237638822873,
-      "estimated_recompute_ms": 5.050896003842354
+      "min_savings_mb": 0.25,
+      "max_candidates": 8,
+      "max_recompute_ratio": 1.0,
+      "min_recompute_budget_ms": 1.0,
+      "prefer_peak_overlap": true,
+      "exclude_view_like_ops": true,
+      "allowed_recompute_ms": 344.7842564593302,
+      "estimated_recompute_ms": 20.26681593619287
     }
   },
   "activations": [
@@ -761,7 +763,7 @@
       "required_input_names": [
         "arg1_1"
       ],
-      "recompute_cost_ms": 0.0936960019171238,
+      "recompute_cost_ms": 0.09625599905848503,
       "retained": true
     },
     {
@@ -781,7 +783,7 @@
         "arg1_2",
         "slice_1"
       ],
-      "recompute_cost_ms": 0.2488320041447878,
+      "recompute_cost_ms": 0.2780160028487444,
       "retained": true
     },
     {
@@ -806,7 +808,7 @@
         "expand_1",
         "slice_1"
       ],
-      "recompute_cost_ms": 1.0301439873874187,
+      "recompute_cost_ms": 0.884223997592926,
       "retained": true
     },
     {
@@ -828,7 +830,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.25548800081014633,
+      "recompute_cost_ms": 0.20835200231522322,
       "retained": true
     },
     {
@@ -850,7 +852,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.254976000636816,
+      "recompute_cost_ms": 0.2068000016734004,
       "retained": true
     },
     {
@@ -872,7 +874,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.4300800017081201,
+      "recompute_cost_ms": 0.35888000298291445,
       "retained": true
     },
     {
@@ -893,7 +895,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.4838400026783347,
+      "recompute_cost_ms": 0.40854400396347046,
       "retained": true
     },
     {
@@ -912,7 +914,7 @@
       "required_input_names": [
         "arg0_6"
       ],
-      "recompute_cost_ms": 0.02150399936363101,
+      "recompute_cost_ms": 0.044495999813079834,
       "retained": true
     },
     {
@@ -935,7 +937,7 @@
         "t",
         "view"
       ],
-      "recompute_cost_ms": 2.1227519623935223,
+      "recompute_cost_ms": 1.6307200472801924,
       "retained": true
     },
     {
@@ -956,7 +958,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.4817920019850135,
+      "recompute_cost_ms": 0.41110400296747684,
       "retained": true
     },
     {
@@ -975,7 +977,7 @@
       "required_input_names": [
         "arg0_8"
       ],
-      "recompute_cost_ms": 0.02713599894195795,
+      "recompute_cost_ms": 0.035840000957250595,
       "retained": true
     },
     {
@@ -998,7 +1000,7 @@
         "t_1",
         "view_3"
       ],
-      "recompute_cost_ms": 2.3275519739836454,
+      "recompute_cost_ms": 1.6829439550638199,
       "retained": true
     },
     {
@@ -1019,7 +1021,7 @@
         "arg0_4",
         "arg0_5"
       ],
-      "recompute_cost_ms": 0.4812800018116832,
+      "recompute_cost_ms": 0.40086400136351585,
       "retained": true
     },
     {
@@ -1038,7 +1040,7 @@
       "required_input_names": [
         "arg0_10"
       ],
-      "recompute_cost_ms": 0.04095999896526337,
+      "recompute_cost_ms": 0.03686399944126606,
       "retained": true
     },
     {
@@ -1061,7 +1063,7 @@
         "t_2",
         "view_6"
       ],
-      "recompute_cost_ms": 2.104832025244832,
+      "recompute_cost_ms": 1.5457279477268457,
       "retained": true
     },
     {
@@ -1082,7 +1084,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.744384000194259,
+      "recompute_cost_ms": 1.8156160106882453,
       "retained": true
     },
     {
@@ -1106,7 +1108,7 @@
         "transpose_1",
         "transpose_2"
       ],
-      "recompute_cost_ms": 6.749184125103056,
+      "recompute_cost_ms": 4.84708805475384,
       "retained": true
     },
     {
@@ -1129,7 +1131,7 @@
         "transpose_1",
         "transpose_2"
       ],
-      "recompute_cost_ms": 6.740480124950409,
+      "recompute_cost_ms": 4.840960053727031,
       "retained": true
     },
     {
@@ -1148,7 +1150,7 @@
         "transpose_1",
         "transpose_2"
       ],
-      "recompute_cost_ms": 6.738432124257088,
+      "recompute_cost_ms": 4.834832053631544,
       "retained": true
     },
     {
@@ -1167,7 +1169,7 @@
         "transpose_1",
         "transpose_2"
       ],
-      "recompute_cost_ms": 6.729728124686517,
+      "recompute_cost_ms": 4.8353280536830425,
       "retained": true
     },
     {
@@ -1186,7 +1188,7 @@
       "required_input_names": [
         "getitem_5"
       ],
-      "recompute_cost_ms": 0.17868800088763237,
+      "recompute_cost_ms": 0.15924800001084805,
       "retained": true
     },
     {
@@ -1205,7 +1207,7 @@
       "required_input_names": [
         "arg0_12"
       ],
-      "recompute_cost_ms": 0.0307200001552701,
+      "recompute_cost_ms": 0.039424000307917595,
       "retained": true
     },
     {
@@ -1227,7 +1229,7 @@
         "t_3",
         "view_10"
       ],
-      "recompute_cost_ms": 2.797055983915925,
+      "recompute_cost_ms": 2.202111971564591,
       "retained": true
     },
     {
@@ -1252,7 +1254,7 @@
         "t_3",
         "view_10"
       ],
-      "recompute_cost_ms": 3.363839987665415,
+      "recompute_cost_ms": 2.7073919754475355,
       "retained": true
     },
     {
@@ -1274,7 +1276,7 @@
         "arg0_14",
         "arg0_15"
       ],
-      "recompute_cost_ms": 0.25600000470876694,
+      "recompute_cost_ms": 0.22067199554294348,
       "retained": true
     },
     {
@@ -1296,7 +1298,7 @@
         "arg0_14",
         "arg0_15"
       ],
-      "recompute_cost_ms": 0.2498560044914484,
+      "recompute_cost_ms": 0.21862399578094482,
       "retained": true
     },
     {
@@ -1317,7 +1319,7 @@
         "arg0_14",
         "arg0_15"
       ],
-      "recompute_cost_ms": 0.3148800041526556,
+      "recompute_cost_ms": 0.27187199518084526,
       "retained": true
     },
     {
@@ -1336,7 +1338,7 @@
       "required_input_names": [
         "arg0_16"
       ],
-      "recompute_cost_ms": 0.04198399931192398,
+      "recompute_cost_ms": 0.048127999529242516,
       "retained": true
     },
     {
@@ -1358,7 +1360,7 @@
         "t_4",
         "view_12"
       ],
-      "recompute_cost_ms": 7.413247883319855,
+      "recompute_cost_ms": 6.048768222332001,
       "retained": true
     },
     {
@@ -1377,7 +1379,7 @@
       "required_input_names": [
         "view_13"
       ],
-      "recompute_cost_ms": 0.4177919961512089,
+      "recompute_cost_ms": 1.1340800002217293,
       "retained": true
     },
     {
@@ -1396,7 +1398,7 @@
       "required_input_names": [
         "arg0_18"
       ],
-      "recompute_cost_ms": 0.04556799866259098,
+      "recompute_cost_ms": 0.0404640007764101,
       "retained": true
     },
     {
@@ -1418,7 +1420,7 @@
         "t_5",
         "view_14"
       ],
-      "recompute_cost_ms": 7.443967846222222,
+      "recompute_cost_ms": 5.429760076105595,
       "retained": true
     },
     {
@@ -1443,7 +1445,7 @@
         "t_5",
         "view_14"
       ],
-      "recompute_cost_ms": 7.829503854736686,
+      "recompute_cost_ms": 5.773312071338296,
       "retained": true
     },
     {
@@ -1465,7 +1467,7 @@
         "arg0_20",
         "arg0_21"
       ],
-      "recompute_cost_ms": 0.24575999937951565,
+      "recompute_cost_ms": 0.2084159990772605,
       "retained": true
     },
     {
@@ -1487,7 +1489,7 @@
         "arg0_20",
         "arg0_21"
       ],
-      "recompute_cost_ms": 0.2524159997701645,
+      "recompute_cost_ms": 0.20838399976491928,
       "retained": true
     },
     {
@@ -1508,7 +1510,7 @@
         "arg0_20",
         "arg0_21"
       ],
-      "recompute_cost_ms": 0.3020799998193979,
+      "recompute_cost_ms": 0.2641920009627938,
       "retained": true
     },
     {
@@ -1527,7 +1529,7 @@
       "required_input_names": [
         "arg0_22"
       ],
-      "recompute_cost_ms": 0.04198399931192398,
+      "recompute_cost_ms": 0.04863999970257282,
       "retained": true
     },
     {
@@ -1550,7 +1552,7 @@
         "t_6",
         "view_16"
       ],
-      "recompute_cost_ms": 2.064896044321358,
+      "recompute_cost_ms": 1.8872639946639538,
       "retained": true
     },
     {
@@ -1571,7 +1573,7 @@
         "arg0_20",
         "arg0_21"
       ],
-      "recompute_cost_ms": 0.2959359996020794,
+      "recompute_cost_ms": 0.2570240003988147,
       "retained": true
     },
     {
@@ -1590,7 +1592,7 @@
       "required_input_names": [
         "arg0_24"
       ],
-      "recompute_cost_ms": 0.039424000307917595,
+      "recompute_cost_ms": 0.03839999996125698,
       "retained": true
     },
     {
@@ -1613,7 +1615,7 @@
         "t_7",
         "view_19"
       ],
-      "recompute_cost_ms": 2.0792320109903812,
+      "recompute_cost_ms": 1.661440009251237,
       "retained": true
     },
     {
@@ -1634,7 +1636,7 @@
         "arg0_20",
         "arg0_21"
       ],
-      "recompute_cost_ms": 0.29286399856209755,
+      "recompute_cost_ms": 0.27596799936145544,
       "retained": true
     },
     {
@@ -1653,7 +1655,7 @@
       "required_input_names": [
         "arg0_26"
       ],
-      "recompute_cost_ms": 0.0363520011305809,
+      "recompute_cost_ms": 0.053247999399900436,
       "retained": true
     },
     {
@@ -1676,7 +1678,7 @@
         "t_8",
         "view_22"
       ],
-      "recompute_cost_ms": 2.054656002204865,
+      "recompute_cost_ms": 1.684991979971528,
       "retained": true
     },
     {
@@ -1697,7 +1699,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7198079988593236,
+      "recompute_cost_ms": 1.9179680095985532,
       "retained": true
     },
     {
@@ -1721,7 +1723,7 @@
         "transpose_5",
         "transpose_6"
       ],
-      "recompute_cost_ms": 6.751743928529322,
+      "recompute_cost_ms": 4.881919911131263,
       "retained": true
     },
     {
@@ -1744,7 +1746,7 @@
         "transpose_5",
         "transpose_6"
       ],
-      "recompute_cost_ms": 6.7461119294166565,
+      "recompute_cost_ms": 4.8782879114151,
       "retained": true
     },
     {
@@ -1763,7 +1765,7 @@
         "transpose_5",
         "transpose_6"
       ],
-      "recompute_cost_ms": 6.748159929178655,
+      "recompute_cost_ms": 4.874239910393953,
       "retained": true
     },
     {
@@ -1782,7 +1784,7 @@
         "transpose_5",
         "transpose_6"
       ],
-      "recompute_cost_ms": 6.7471359288319945,
+      "recompute_cost_ms": 4.875263910740614,
       "retained": true
     },
     {
@@ -1801,7 +1803,7 @@
       "required_input_names": [
         "getitem_19"
       ],
-      "recompute_cost_ms": 0.15358399786055088,
+      "recompute_cost_ms": 0.34611199982464314,
       "retained": true
     },
     {
@@ -1820,7 +1822,7 @@
       "required_input_names": [
         "arg0_28"
       ],
-      "recompute_cost_ms": 0.04607999883592129,
+      "recompute_cost_ms": 0.09164800308644772,
       "retained": true
     },
     {
@@ -1842,7 +1844,7 @@
         "t_9",
         "view_26"
       ],
-      "recompute_cost_ms": 2.211840059608221,
+      "recompute_cost_ms": 2.0116479638963938,
       "retained": true
     },
     {
@@ -1867,7 +1869,7 @@
         "t_9",
         "view_26"
       ],
-      "recompute_cost_ms": 2.5850880588404834,
+      "recompute_cost_ms": 2.391583966091275,
       "retained": true
     },
     {
@@ -1889,7 +1891,7 @@
         "arg0_30",
         "arg0_31"
       ],
-      "recompute_cost_ms": 0.2600960014387965,
+      "recompute_cost_ms": 0.2739200061187148,
       "retained": true
     },
     {
@@ -1911,7 +1913,7 @@
         "arg0_30",
         "arg0_31"
       ],
-      "recompute_cost_ms": 0.25600000098347664,
+      "recompute_cost_ms": 0.27596800681203604,
       "retained": true
     },
     {
@@ -1932,7 +1934,7 @@
         "arg0_30",
         "arg0_31"
       ],
-      "recompute_cost_ms": 0.3087360020726919,
+      "recompute_cost_ms": 0.3420320078730583,
       "retained": true
     },
     {
@@ -1951,7 +1953,7 @@
       "required_input_names": [
         "arg0_32"
       ],
-      "recompute_cost_ms": 0.04505600035190582,
+      "recompute_cost_ms": 0.05174400098621845,
       "retained": true
     },
     {
@@ -1973,7 +1975,7 @@
         "t_10",
         "view_28"
       ],
-      "recompute_cost_ms": 7.380480110645294,
+      "recompute_cost_ms": 6.1614079028368,
       "retained": true
     },
     {
@@ -1992,7 +1994,7 @@
       "required_input_names": [
         "view_29"
       ],
-      "recompute_cost_ms": 0.4270080029964447,
+      "recompute_cost_ms": 1.1658240221440792,
       "retained": true
     },
     {
@@ -2011,7 +2013,7 @@
       "required_input_names": [
         "arg0_34"
       ],
-      "recompute_cost_ms": 0.044544000178575516,
+      "recompute_cost_ms": 0.048127999529242516,
       "retained": true
     },
     {
@@ -2033,7 +2035,7 @@
         "t_11",
         "view_30"
       ],
-      "recompute_cost_ms": 7.471103997901082,
+      "recompute_cost_ms": 5.472719999030232,
       "retained": true
     },
     {
@@ -2058,7 +2060,7 @@
         "t_11",
         "view_30"
       ],
-      "recompute_cost_ms": 7.872511999681592,
+      "recompute_cost_ms": 5.871632006950676,
       "retained": true
     },
     {
@@ -2080,7 +2082,7 @@
         "arg0_36",
         "arg0_37"
       ],
-      "recompute_cost_ms": 0.2529279962182045,
+      "recompute_cost_ms": 0.22169599868357182,
       "retained": true
     },
     {
@@ -2102,7 +2104,7 @@
         "arg0_36",
         "arg0_37"
       ],
-      "recompute_cost_ms": 0.2544639967381954,
+      "recompute_cost_ms": 0.21913599874824286,
       "retained": true
     },
     {
@@ -2123,7 +2125,7 @@
         "arg0_36",
         "arg0_37"
       ],
-      "recompute_cost_ms": 0.3010559952817857,
+      "recompute_cost_ms": 0.29388799890875816,
       "retained": true
     },
     {
@@ -2142,7 +2144,7 @@
       "required_input_names": [
         "arg0_38"
       ],
-      "recompute_cost_ms": 0.04915199987590313,
+      "recompute_cost_ms": 0.04710400104522705,
       "retained": true
     },
     {
@@ -2165,7 +2167,7 @@
         "t_12",
         "view_32"
       ],
-      "recompute_cost_ms": 2.0863999845460057,
+      "recompute_cost_ms": 1.5902720112353563,
       "retained": true
     },
     {
@@ -2186,7 +2188,7 @@
         "arg0_36",
         "arg0_37"
       ],
-      "recompute_cost_ms": 0.2918399958871305,
+      "recompute_cost_ms": 0.286719998344779,
       "retained": true
     },
     {
@@ -2205,7 +2207,7 @@
       "required_input_names": [
         "arg0_40"
       ],
-      "recompute_cost_ms": 0.03379200026392937,
+      "recompute_cost_ms": 0.041471999138593674,
       "retained": true
     },
     {
@@ -2228,7 +2230,7 @@
         "t_13",
         "view_35"
       ],
-      "recompute_cost_ms": 2.038272013538517,
+      "recompute_cost_ms": 1.5953919272869825,
       "retained": true
     },
     {
@@ -2249,7 +2251,7 @@
         "arg0_36",
         "arg0_37"
       ],
-      "recompute_cost_ms": 0.3010559952817857,
+      "recompute_cost_ms": 0.27908799797296524,
       "retained": true
     },
     {
@@ -2268,7 +2270,7 @@
       "required_input_names": [
         "arg0_42"
       ],
-      "recompute_cost_ms": 0.03276799991726875,
+      "recompute_cost_ms": 0.03891200013458729,
       "retained": true
     },
     {
@@ -2291,7 +2293,7 @@
         "t_14",
         "view_38"
       ],
-      "recompute_cost_ms": 2.124287996441126,
+      "recompute_cost_ms": 1.553920028731227,
       "retained": true
     },
     {
@@ -2312,7 +2314,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7577120029600337,
+      "recompute_cost_ms": 1.925216001458466,
       "retained": true
     },
     {
@@ -2336,7 +2338,7 @@
         "transpose_8",
         "transpose_9"
       ],
-      "recompute_cost_ms": 6.740992145612836,
+      "recompute_cost_ms": 4.852223929017782,
       "retained": true
     },
     {
@@ -2359,7 +2361,7 @@
         "transpose_8",
         "transpose_9"
       ],
-      "recompute_cost_ms": 6.731776146218181,
+      "recompute_cost_ms": 4.836351931095123,
       "retained": true
     },
     {
@@ -2378,7 +2380,7 @@
         "transpose_8",
         "transpose_9"
       ],
-      "recompute_cost_ms": 6.734336147084832,
+      "recompute_cost_ms": 4.835327930748463,
       "retained": true
     },
     {
@@ -2397,7 +2399,7 @@
         "transpose_8",
         "transpose_9"
       ],
-      "recompute_cost_ms": 6.722560145892203,
+      "recompute_cost_ms": 4.83942393027246,
       "retained": true
     },
     {
@@ -2416,7 +2418,7 @@
       "required_input_names": [
         "getitem_33"
       ],
-      "recompute_cost_ms": 0.15871999971568584,
+      "recompute_cost_ms": 0.16588800214231014,
       "retained": true
     },
     {
@@ -2435,7 +2437,7 @@
       "required_input_names": [
         "arg0_44"
       ],
-      "recompute_cost_ms": 0.04556799866259098,
+      "recompute_cost_ms": 0.03891200013458729,
       "retained": true
     },
     {
@@ -2457,7 +2459,7 @@
         "t_15",
         "view_42"
       ],
-      "recompute_cost_ms": 2.0285439416766167,
+      "recompute_cost_ms": 1.914368043653667,
       "retained": true
     },
     {
@@ -2482,7 +2484,7 @@
         "t_15",
         "view_42"
       ],
-      "recompute_cost_ms": 2.3751679374836385,
+      "recompute_cost_ms": 2.2707200404256582,
       "retained": true
     },
     {
@@ -2504,7 +2506,7 @@
         "arg0_46",
         "arg0_47"
       ],
-      "recompute_cost_ms": 0.21811199840158224,
+      "recompute_cost_ms": 0.20582400262355804,
       "retained": true
     },
     {
@@ -2526,7 +2528,7 @@
         "arg0_46",
         "arg0_47"
       ],
-      "recompute_cost_ms": 0.2170879989862442,
+      "recompute_cost_ms": 0.20684800297021866,
       "retained": true
     },
     {
@@ -2547,7 +2549,7 @@
         "arg0_46",
         "arg0_47"
       ],
-      "recompute_cost_ms": 0.2744319988414645,
+      "recompute_cost_ms": 0.2565120030194521,
       "retained": true
     },
     {
@@ -2566,7 +2568,7 @@
       "required_input_names": [
         "arg0_48"
       ],
-      "recompute_cost_ms": 0.03686399944126606,
+      "recompute_cost_ms": 0.0491040013730526,
       "retained": true
     },
     {
@@ -2588,7 +2590,7 @@
         "t_16",
         "view_44"
       ],
-      "recompute_cost_ms": 5.763072144240141,
+      "recompute_cost_ms": 6.066687986254692,
       "retained": true
     },
     {
@@ -2607,7 +2609,7 @@
       "required_input_names": [
         "view_45"
       ],
-      "recompute_cost_ms": 0.38860801234841347,
+      "recompute_cost_ms": 1.1274240165948868,
       "retained": true
     },
     {
@@ -2626,7 +2628,7 @@
       "required_input_names": [
         "arg0_50"
       ],
-      "recompute_cost_ms": 0.030208000913262367,
+      "recompute_cost_ms": 0.044544000178575516,
       "retained": true
     },
     {
@@ -2648,7 +2650,7 @@
         "t_17",
         "view_46"
       ],
-      "recompute_cost_ms": 5.803008137852885,
+      "recompute_cost_ms": 5.427711981348693,
       "retained": true
     },
     {
@@ -2673,7 +2675,7 @@
         "t_17",
         "view_46"
       ],
-      "recompute_cost_ms": 6.153216136619449,
+      "recompute_cost_ms": 5.747711982578039,
       "retained": true
     },
     {
@@ -2695,7 +2697,7 @@
         "arg0_52",
         "arg0_53"
       ],
-      "recompute_cost_ms": 0.2283519972115755,
+      "recompute_cost_ms": 0.20838399976491928,
       "retained": true
     },
     {
@@ -2717,7 +2719,7 @@
         "arg0_52",
         "arg0_53"
       ],
-      "recompute_cost_ms": 0.22579199727624655,
+      "recompute_cost_ms": 0.20787199959158897,
       "retained": true
     },
     {
@@ -2738,7 +2740,7 @@
         "arg0_52",
         "arg0_53"
       ],
-      "recompute_cost_ms": 0.28671999694779515,
+      "recompute_cost_ms": 0.26009600050747395,
       "retained": true
     },
     {
@@ -2757,7 +2759,7 @@
       "required_input_names": [
         "arg0_54"
       ],
-      "recompute_cost_ms": 0.043007999658584595,
+      "recompute_cost_ms": 0.04044799879193306,
       "retained": true
     },
     {
@@ -2780,7 +2782,7 @@
         "t_18",
         "view_48"
       ],
-      "recompute_cost_ms": 1.8273280430585146,
+      "recompute_cost_ms": 1.5713280085474253,
       "retained": true
     },
     {
@@ -2801,7 +2803,7 @@
         "arg0_52",
         "arg0_53"
       ],
-      "recompute_cost_ms": 0.24985599657520652,
+      "recompute_cost_ms": 0.24990399926900864,
       "retained": true
     },
     {
@@ -2820,7 +2822,7 @@
       "required_input_names": [
         "arg0_56"
       ],
-      "recompute_cost_ms": 0.039424000307917595,
+      "recompute_cost_ms": 0.0435199998319149,
       "retained": true
     },
     {
@@ -2843,7 +2845,7 @@
         "t_19",
         "view_51"
       ],
-      "recompute_cost_ms": 1.6619519777595997,
+      "recompute_cost_ms": 1.551344009116292,
       "retained": true
     },
     {
@@ -2864,7 +2866,7 @@
         "arg0_52",
         "arg0_53"
       ],
-      "recompute_cost_ms": 0.2580639966763556,
+      "recompute_cost_ms": 0.24883199855685234,
       "retained": true
     },
     {
@@ -2883,7 +2885,7 @@
       "required_input_names": [
         "arg0_58"
       ],
-      "recompute_cost_ms": 0.034304000437259674,
+      "recompute_cost_ms": 0.0399360004812479,
       "retained": true
     },
     {
@@ -2906,7 +2908,7 @@
         "t_20",
         "view_54"
       ],
-      "recompute_cost_ms": 1.6404480505734682,
+      "recompute_cost_ms": 1.5262880213558674,
       "retained": true
     },
     {
@@ -2927,7 +2929,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.9819520191522315,
+      "recompute_cost_ms": 1.8099520122632384,
       "retained": true
     },
     {
@@ -2951,7 +2953,7 @@
         "transpose_13",
         "transpose_14"
       ],
-      "recompute_cost_ms": 5.221888065338135,
+      "recompute_cost_ms": 4.844032045453787,
       "retained": true
     },
     {
@@ -2974,7 +2976,7 @@
         "transpose_13",
         "transpose_14"
       ],
-      "recompute_cost_ms": 5.202432065852918,
+      "recompute_cost_ms": 4.835328046232462,
       "retained": true
     },
     {
@@ -2993,7 +2995,7 @@
         "transpose_13",
         "transpose_14"
       ],
-      "recompute_cost_ms": 5.203968066256493,
+      "recompute_cost_ms": 4.836336045525968,
       "retained": true
     },
     {
@@ -3012,7 +3014,7 @@
         "transpose_13",
         "transpose_14"
       ],
-      "recompute_cost_ms": 5.2126720659434795,
+      "recompute_cost_ms": 4.8399360459297895,
       "retained": true
     },
     {
@@ -3031,7 +3033,7 @@
       "required_input_names": [
         "getitem_47"
       ],
-      "recompute_cost_ms": 0.152063999325037,
+      "recompute_cost_ms": 0.162304000928998,
       "retained": true
     },
     {
@@ -3050,7 +3052,7 @@
       "required_input_names": [
         "arg0_60"
       ],
-      "recompute_cost_ms": 0.0399360004812479,
+      "recompute_cost_ms": 0.0419359989464283,
       "retained": true
     },
     {
@@ -3072,7 +3074,7 @@
         "t_21",
         "view_58"
       ],
-      "recompute_cost_ms": 1.93433597125113,
+      "recompute_cost_ms": 1.6623999364674091,
       "retained": true
     },
     {
@@ -3097,7 +3099,7 @@
         "t_21",
         "view_58"
       ],
-      "recompute_cost_ms": 2.1104639689438045,
+      "recompute_cost_ms": 1.9849599367007613,
       "retained": true
     },
     {
@@ -3119,7 +3121,7 @@
         "arg0_62",
         "arg0_63"
       ],
-      "recompute_cost_ms": 0.21350399171933532,
+      "recompute_cost_ms": 0.20787199959158897,
       "retained": true
     },
     {
@@ -3141,7 +3143,7 @@
         "arg0_62",
         "arg0_63"
       ],
-      "recompute_cost_ms": 0.216063991189003,
+      "recompute_cost_ms": 0.20787199959158897,
       "retained": true
     },
     {
@@ -3162,7 +3164,7 @@
         "arg0_62",
         "arg0_63"
       ],
-      "recompute_cost_ms": 0.2744319913908839,
+      "recompute_cost_ms": 0.25958399940282106,
       "retained": true
     },
     {
@@ -3181,7 +3183,7 @@
       "required_input_names": [
         "arg0_64"
       ],
-      "recompute_cost_ms": 0.04198399931192398,
+      "recompute_cost_ms": 0.05273600108921528,
       "retained": true
     },
     {
@@ -3203,7 +3205,7 @@
         "t_22",
         "view_60"
       ],
-      "recompute_cost_ms": 5.737456092610955,
+      "recompute_cost_ms": 6.051840106025338,
       "retained": true
     },
     {
@@ -3222,7 +3224,7 @@
       "required_input_names": [
         "view_61"
       ],
-      "recompute_cost_ms": 0.38963199965655804,
+      "recompute_cost_ms": 1.1028480120003223,
       "retained": true
     },
     {
@@ -3241,7 +3243,7 @@
       "required_input_names": [
         "arg0_66"
       ],
-      "recompute_cost_ms": 0.04608000069856644,
+      "recompute_cost_ms": 0.04249600134789944,
       "retained": true
     },
     {
@@ -3263,7 +3265,7 @@
         "t_23",
         "view_62"
       ],
-      "recompute_cost_ms": 5.746175801381469,
+      "recompute_cost_ms": 5.413888112641871,
       "retained": true
     },
     {
@@ -3288,7 +3290,7 @@
         "t_23",
         "view_62"
       ],
-      "recompute_cost_ms": 6.297599797137082,
+      "recompute_cost_ms": 5.736960116773844,
       "retained": true
     },
     {
@@ -3310,7 +3312,7 @@
         "arg0_68",
         "arg0_69"
       ],
-      "recompute_cost_ms": 0.2145280009135604,
+      "recompute_cost_ms": 0.20787199959158897,
       "retained": true
     },
     {
@@ -3332,7 +3334,7 @@
         "arg0_68",
         "arg0_69"
       ],
-      "recompute_cost_ms": 0.21299200132489204,
+      "recompute_cost_ms": 0.21299200039356947,
       "retained": true
     },
     {
@@ -3353,7 +3355,7 @@
         "arg0_68",
         "arg0_69"
       ],
-      "recompute_cost_ms": 0.2631680015474558,
+      "recompute_cost_ms": 0.2611039998009801,
       "retained": true
     },
     {
@@ -3372,7 +3374,7 @@
       "required_input_names": [
         "arg0_70"
       ],
-      "recompute_cost_ms": 0.0435199998319149,
+      "recompute_cost_ms": 0.041471999138593674,
       "retained": true
     },
     {
@@ -3395,7 +3397,7 @@
         "t_24",
         "view_64"
       ],
-      "recompute_cost_ms": 1.660415980964899,
+      "recompute_cost_ms": 1.5744480025023222,
       "retained": true
     },
     {
@@ -3416,7 +3418,7 @@
         "arg0_68",
         "arg0_69"
       ],
-      "recompute_cost_ms": 0.25956800021231174,
+      "recompute_cost_ms": 0.25137600023299456,
       "retained": true
     },
     {
@@ -3435,7 +3437,7 @@
       "required_input_names": [
         "arg0_72"
       ],
-      "recompute_cost_ms": 0.03532800078392029,
+      "recompute_cost_ms": 0.04296000115573406,
       "retained": true
     },
     {
@@ -3458,7 +3460,7 @@
         "t_25",
         "view_67"
       ],
-      "recompute_cost_ms": 1.8652159478515387,
+      "recompute_cost_ms": 1.5411199666559696,
       "retained": true
     },
     {
@@ -3479,7 +3481,7 @@
         "arg0_68",
         "arg0_69"
       ],
-      "recompute_cost_ms": 0.25344000197947025,
+      "recompute_cost_ms": 0.25240000057965517,
       "retained": true
     },
     {
@@ -3498,7 +3500,7 @@
       "required_input_names": [
         "arg0_74"
       ],
-      "recompute_cost_ms": 0.0363520011305809,
+      "recompute_cost_ms": 0.039424000307917595,
       "retained": true
     },
     {
@@ -3521,7 +3523,7 @@
         "t_26",
         "view_70"
       ],
-      "recompute_cost_ms": 1.6532479785382748,
+      "recompute_cost_ms": 1.5887360256165266,
       "retained": true
     },
     {
@@ -3542,7 +3544,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7500160058261827,
+      "recompute_cost_ms": 1.9384640054777265,
       "retained": true
     },
     {
@@ -3566,7 +3568,7 @@
         "transpose_17",
         "transpose_18"
       ],
-      "recompute_cost_ms": 5.237759979441762,
+      "recompute_cost_ms": 4.870639946311712,
       "retained": true
     },
     {
@@ -3589,7 +3591,7 @@
         "transpose_17",
         "transpose_18"
       ],
-      "recompute_cost_ms": 5.53932798653841,
+      "recompute_cost_ms": 4.855279945768416,
       "retained": true
     },
     {
@@ -3608,7 +3610,7 @@
         "transpose_17",
         "transpose_18"
       ],
-      "recompute_cost_ms": 5.236223979853094,
+      "recompute_cost_ms": 4.853231946006417,
       "retained": true
     },
     {
@@ -3627,7 +3629,7 @@
         "transpose_17",
         "transpose_18"
       ],
-      "recompute_cost_ms": 5.234175979159772,
+      "recompute_cost_ms": 4.84964794665575,
       "retained": true
     },
     {
@@ -3646,7 +3648,7 @@
       "required_input_names": [
         "getitem_61"
       ],
-      "recompute_cost_ms": 0.11212799896020442,
+      "recompute_cost_ms": 0.22580800019204617,
       "retained": true
     },
     {
@@ -3665,7 +3667,7 @@
       "required_input_names": [
         "arg0_76"
       ],
-      "recompute_cost_ms": 0.041471999138593674,
+      "recompute_cost_ms": 0.05222400091588497,
       "retained": true
     },
     {
@@ -3687,7 +3689,7 @@
         "t_27",
         "view_74"
       ],
-      "recompute_cost_ms": 1.9553279746323824,
+      "recompute_cost_ms": 1.95788798853755,
       "retained": true
     },
     {
@@ -3712,7 +3714,7 @@
         "t_27",
         "view_74"
       ],
-      "recompute_cost_ms": 2.280959976837039,
+      "recompute_cost_ms": 2.2927199881523848,
       "retained": true
     },
     {
@@ -3734,7 +3736,7 @@
         "arg0_78",
         "arg0_79"
       ],
-      "recompute_cost_ms": 0.2170879952609539,
+      "recompute_cost_ms": 0.21195200271904469,
       "retained": true
     },
     {
@@ -3756,7 +3758,7 @@
         "arg0_78",
         "arg0_79"
       ],
-      "recompute_cost_ms": 0.21094399504363537,
+      "recompute_cost_ms": 0.2078560022637248,
       "retained": true
     },
     {
@@ -3777,7 +3779,7 @@
         "arg0_78",
         "arg0_79"
       ],
-      "recompute_cost_ms": 0.2662399960681796,
+      "recompute_cost_ms": 0.26881600357592106,
       "retained": true
     },
     {
@@ -3796,7 +3798,7 @@
       "required_input_names": [
         "arg0_80"
       ],
-      "recompute_cost_ms": 0.037887999787926674,
+      "recompute_cost_ms": 0.04915199987590313,
       "retained": true
     },
     {
@@ -3818,7 +3820,7 @@
         "t_28",
         "view_76"
       ],
-      "recompute_cost_ms": 5.734400220215321,
+      "recompute_cost_ms": 6.109711837023497,
       "retained": true
     },
     {
@@ -3837,7 +3839,7 @@
       "required_input_names": [
         "view_77"
       ],
-      "recompute_cost_ms": 0.37632000632584095,
+      "recompute_cost_ms": 1.162239994853735,
       "retained": true
     },
     {
@@ -3856,7 +3858,7 @@
       "required_input_names": [
         "arg0_82"
       ],
-      "recompute_cost_ms": 0.020991999190300703,
+      "recompute_cost_ms": 0.04863999970257282,
       "retained": true
     },
     {
@@ -3878,7 +3880,7 @@
         "t_29",
         "view_78"
       ],
-      "recompute_cost_ms": 5.7620478589087725,
+      "recompute_cost_ms": 5.4420000202953815,
       "retained": true
     },
     {
@@ -3903,7 +3905,7 @@
         "t_29",
         "view_78"
       ],
-      "recompute_cost_ms": 6.096383859403431,
+      "recompute_cost_ms": 5.768160021863878,
       "retained": true
     },
     {
@@ -3925,7 +3927,7 @@
         "arg0_84",
         "arg0_85"
       ],
-      "recompute_cost_ms": 0.187391996383667,
+      "recompute_cost_ms": 0.2329599978402257,
       "retained": true
     },
     {
@@ -3947,7 +3949,7 @@
         "arg0_84",
         "arg0_85"
       ],
-      "recompute_cost_ms": 0.1776639964664355,
+      "recompute_cost_ms": 0.22732799779623747,
       "retained": true
     },
     {
@@ -3968,7 +3970,7 @@
         "arg0_84",
         "arg0_85"
       ],
-      "recompute_cost_ms": 0.22835199534893036,
+      "recompute_cost_ms": 0.283135998994112,
       "retained": true
     },
     {
@@ -3987,7 +3989,7 @@
       "required_input_names": [
         "arg0_86"
       ],
-      "recompute_cost_ms": 0.041471999138593674,
+      "recompute_cost_ms": 0.05120000056922436,
       "retained": true
     },
     {
@@ -4010,7 +4012,7 @@
         "t_30",
         "view_80"
       ],
-      "recompute_cost_ms": 1.6670560110360384,
+      "recompute_cost_ms": 1.7848319299519062,
       "retained": true
     },
     {
@@ -4031,7 +4033,7 @@
         "arg0_84",
         "arg0_85"
       ],
-      "recompute_cost_ms": 0.22732799593359232,
+      "recompute_cost_ms": 0.2759679965674877,
       "retained": true
     },
     {
@@ -4050,7 +4052,7 @@
       "required_input_names": [
         "arg0_88"
       ],
-      "recompute_cost_ms": 0.03532799892127514,
+      "recompute_cost_ms": 0.03993599861860275,
       "retained": true
     },
     {
@@ -4073,7 +4075,7 @@
         "t_31",
         "view_83"
       ],
-      "recompute_cost_ms": 1.6552959773689508,
+      "recompute_cost_ms": 1.5902720037847757,
       "retained": true
     },
     {
@@ -4094,7 +4096,7 @@
         "arg0_84",
         "arg0_85"
       ],
-      "recompute_cost_ms": 0.2431999957188964,
+      "recompute_cost_ms": 0.2795039974153042,
       "retained": true
     },
     {
@@ -4113,7 +4115,7 @@
       "required_input_names": [
         "arg0_90"
       ],
-      "recompute_cost_ms": 0.03839999996125698,
+      "recompute_cost_ms": 0.04556800052523613,
       "retained": true
     },
     {
@@ -4136,7 +4138,7 @@
         "t_32",
         "view_86"
       ],
-      "recompute_cost_ms": 1.643535990966484,
+      "recompute_cost_ms": 1.5568639636039734,
       "retained": true
     },
     {
@@ -4157,7 +4159,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7802240011515096,
+      "recompute_cost_ms": 2.106912021525204,
       "retained": true
     },
     {
@@ -4181,7 +4183,7 @@
         "transpose_21",
         "transpose_22"
       ],
-      "recompute_cost_ms": 5.206528057344258,
+      "recompute_cost_ms": 4.858879923820496,
       "retained": true
     },
     {
@@ -4204,7 +4206,7 @@
         "transpose_21",
         "transpose_22"
       ],
-      "recompute_cost_ms": 5.203456057235599,
+      "recompute_cost_ms": 4.851679924875498,
       "retained": true
     },
     {
@@ -4223,7 +4225,7 @@
         "transpose_21",
         "transpose_22"
       ],
-      "recompute_cost_ms": 5.196288056671619,
+      "recompute_cost_ms": 4.8502079248428345,
       "retained": true
     },
     {
@@ -4242,7 +4244,7 @@
         "transpose_21",
         "transpose_22"
       ],
-      "recompute_cost_ms": 5.187584056286141,
+      "recompute_cost_ms": 4.84915192425251,
       "retained": true
     },
     {
@@ -4261,7 +4263,7 @@
       "required_input_names": [
         "getitem_75"
       ],
-      "recompute_cost_ms": 0.15718400105834007,
+      "recompute_cost_ms": 0.16694399900734425,
       "retained": true
     },
     {
@@ -4280,7 +4282,7 @@
       "required_input_names": [
         "arg0_92"
       ],
-      "recompute_cost_ms": 0.002528000040911138,
+      "recompute_cost_ms": 0.03993599861860275,
       "retained": true
     },
     {
@@ -4302,7 +4304,7 @@
         "t_33",
         "view_90"
       ],
-      "recompute_cost_ms": 1.7873919727280736,
+      "recompute_cost_ms": 1.6675840504467487,
       "retained": true
     },
     {
@@ -4327,7 +4329,7 @@
         "t_33",
         "view_90"
       ],
-      "recompute_cost_ms": 2.0940799675881863,
+      "recompute_cost_ms": 2.0131360460072756,
       "retained": true
     },
     {
@@ -4349,7 +4351,7 @@
         "arg0_94",
         "arg0_95"
       ],
-      "recompute_cost_ms": 0.22476799972355366,
+      "recompute_cost_ms": 0.2171200020238757,
       "retained": true
     },
     {
@@ -4371,7 +4373,7 @@
         "arg0_94",
         "arg0_95"
       ],
-      "recompute_cost_ms": 0.22118400037288666,
+      "recompute_cost_ms": 0.22425600327551365,
       "retained": true
     },
     {
@@ -4392,7 +4394,7 @@
         "arg0_94",
         "arg0_95"
       ],
-      "recompute_cost_ms": 0.27392000146210194,
+      "recompute_cost_ms": 0.2698240028694272,
       "retained": true
     },
     {
@@ -4411,7 +4413,7 @@
       "required_input_names": [
         "arg0_96"
       ],
-      "recompute_cost_ms": 0.043520000763237476,
+      "recompute_cost_ms": 0.0399360004812479,
       "retained": true
     },
     {
@@ -4433,7 +4435,7 @@
         "t_34",
         "view_92"
       ],
-      "recompute_cost_ms": 5.7471997663378716,
+      "recompute_cost_ms": 6.121472120285034,
       "retained": true
     },
     {
@@ -4452,7 +4454,7 @@
       "required_input_names": [
         "view_93"
       ],
-      "recompute_cost_ms": 0.3537920112721622,
+      "recompute_cost_ms": 2.1314560398459435,
       "retained": true
     },
     {
@@ -4471,7 +4473,7 @@
       "required_input_names": [
         "arg0_98"
       ],
-      "recompute_cost_ms": 0.04403200000524521,
+      "recompute_cost_ms": 0.0435199998319149,
       "retained": true
     },
     {
@@ -4493,7 +4495,7 @@
         "t_35",
         "view_94"
       ],
-      "recompute_cost_ms": 5.806079939939082,
+      "recompute_cost_ms": 4.274688113480806,
       "retained": true
     },
     {
@@ -4518,7 +4520,7 @@
         "t_35",
         "view_94"
       ],
-      "recompute_cost_ms": 6.14860793761909,
+      "recompute_cost_ms": 4.860928108915687,
       "retained": true
     },
     {
@@ -4540,7 +4542,7 @@
         "arg0_100",
         "arg0_101"
       ],
-      "recompute_cost_ms": 0.2124800099991262,
+      "recompute_cost_ms": 0.1853440012782812,
       "retained": true
     },
     {
@@ -4562,7 +4564,7 @@
         "arg0_100",
         "arg0_101"
       ],
-      "recompute_cost_ms": 0.21043201023712754,
+      "recompute_cost_ms": 0.18329600151628256,
       "retained": true
     },
     {
@@ -4583,7 +4585,7 @@
         "arg0_100",
         "arg0_101"
       ],
-      "recompute_cost_ms": 0.2739200107753277,
+      "recompute_cost_ms": 0.2370240017771721,
       "retained": true
     },
     {
@@ -4602,7 +4604,7 @@
       "required_input_names": [
         "arg0_102"
       ],
-      "recompute_cost_ms": 0.04710400104522705,
+      "recompute_cost_ms": 0.04403200000524521,
       "retained": true
     },
     {
@@ -4625,7 +4627,7 @@
         "t_36",
         "view_96"
       ],
-      "recompute_cost_ms": 1.6619520280510187,
+      "recompute_cost_ms": 1.4699360020458698,
       "retained": true
     },
     {
@@ -4646,7 +4648,7 @@
         "arg0_100",
         "arg0_101"
       ],
-      "recompute_cost_ms": 0.24524800991639495,
+      "recompute_cost_ms": 0.2262719999998808,
       "retained": true
     },
     {
@@ -4665,7 +4667,7 @@
       "required_input_names": [
         "arg0_104"
       ],
-      "recompute_cost_ms": 0.0363520011305809,
+      "recompute_cost_ms": 0.037887999787926674,
       "retained": true
     },
     {
@@ -4688,7 +4690,7 @@
         "t_37",
         "view_99"
       ],
-      "recompute_cost_ms": 1.635840005823411,
+      "recompute_cost_ms": 1.4423199910670519,
       "retained": true
     },
     {
@@ -4709,7 +4711,7 @@
         "arg0_100",
         "arg0_101"
       ],
-      "recompute_cost_ms": 0.2621440105140209,
+      "recompute_cost_ms": 0.2242240011692047,
       "retained": true
     },
     {
@@ -4728,7 +4730,7 @@
       "required_input_names": [
         "arg0_106"
       ],
-      "recompute_cost_ms": 0.03328000009059906,
+      "recompute_cost_ms": 0.0363520011305809,
       "retained": true
     },
     {
@@ -4751,7 +4753,7 @@
         "t_38",
         "view_102"
       ],
-      "recompute_cost_ms": 1.3255680035799742,
+      "recompute_cost_ms": 1.4177280012518167,
       "retained": true
     },
     {
@@ -4772,7 +4774,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.729536006343551,
+      "recompute_cost_ms": 1.8360960064455867,
       "retained": true
     },
     {
@@ -4796,7 +4798,7 @@
         "transpose_25",
         "transpose_26"
       ],
-      "recompute_cost_ms": 4.085247914306819,
+      "recompute_cost_ms": 3.8410239377990365,
       "retained": true
     },
     {
@@ -4819,7 +4821,7 @@
         "transpose_25",
         "transpose_26"
       ],
-      "recompute_cost_ms": 4.085247913375497,
+      "recompute_cost_ms": 3.8374399384483695,
       "retained": true
     },
     {
@@ -4838,7 +4840,7 @@
         "transpose_25",
         "transpose_26"
       ],
-      "recompute_cost_ms": 4.086783913895488,
+      "recompute_cost_ms": 3.836927938275039,
       "retained": true
     },
     {
@@ -4857,7 +4859,7 @@
         "transpose_25",
         "transpose_26"
       ],
-      "recompute_cost_ms": 4.079103913158178,
+      "recompute_cost_ms": 3.8353919377550483,
       "retained": true
     },
     {
@@ -4876,7 +4878,7 @@
       "required_input_names": [
         "getitem_89"
       ],
-      "recompute_cost_ms": 0.15564800053834915,
+      "recompute_cost_ms": 0.15667199902236462,
       "retained": true
     },
     {
@@ -4895,7 +4897,7 @@
       "required_input_names": [
         "arg0_108"
       ],
-      "recompute_cost_ms": 0.04044799879193306,
+      "recompute_cost_ms": 0.043007999658584595,
       "retained": true
     },
     {
@@ -4917,7 +4919,7 @@
         "t_39",
         "view_106"
       ],
-      "recompute_cost_ms": 1.6430080579593778,
+      "recompute_cost_ms": 1.8559999903663993,
       "retained": true
     },
     {
@@ -4942,7 +4944,7 @@
         "t_39",
         "view_106"
       ],
-      "recompute_cost_ms": 1.9527680706232786,
+      "recompute_cost_ms": 2.366432001814246,
       "retained": true
     },
     {
@@ -4964,7 +4966,7 @@
         "arg0_110",
         "arg0_111"
       ],
-      "recompute_cost_ms": 0.1873920038342476,
+      "recompute_cost_ms": 0.1812480017542839,
       "retained": true
     },
     {
@@ -4986,7 +4988,7 @@
         "arg0_110",
         "arg0_111"
       ],
-      "recompute_cost_ms": 0.17868800414726138,
+      "recompute_cost_ms": 0.18278400134295225,
       "retained": true
     },
     {
@@ -5007,7 +5009,7 @@
         "arg0_110",
         "arg0_111"
       ],
-      "recompute_cost_ms": 0.23398400377482176,
+      "recompute_cost_ms": 0.22630400210618973,
       "retained": true
     },
     {
@@ -5026,7 +5028,7 @@
       "required_input_names": [
         "arg0_112"
       ],
-      "recompute_cost_ms": 0.03891200013458729,
+      "recompute_cost_ms": 0.039424000307917595,
       "retained": true
     },
     {
@@ -5048,7 +5050,7 @@
         "t_40",
         "view_108"
       ],
-      "recompute_cost_ms": 4.478975987061858,
+      "recompute_cost_ms": 6.128640213981271,
       "retained": true
     },
     {
@@ -5067,7 +5069,7 @@
       "required_input_names": [
         "view_109"
       ],
-      "recompute_cost_ms": 1.0946559738367796,
+      "recompute_cost_ms": 2.1652480363845825,
       "retained": true
     },
     {
@@ -5086,7 +5088,7 @@
       "required_input_names": [
         "arg0_114"
       ],
-      "recompute_cost_ms": 0.024064000230282545,
+      "recompute_cost_ms": 0.04403200000524521,
       "retained": true
     },
     {
@@ -5108,7 +5110,7 @@
         "t_41",
         "view_110"
       ],
-      "recompute_cost_ms": 4.561408080160618,
+      "recompute_cost_ms": 4.293071844615042,
       "retained": true
     },
     {
@@ -5133,7 +5135,7 @@
         "t_41",
         "view_110"
       ],
-      "recompute_cost_ms": 4.855808082036674,
+      "recompute_cost_ms": 4.836271838285029,
       "retained": true
     },
     {
@@ -5155,7 +5157,7 @@
         "arg0_116",
         "arg0_117"
       ],
-      "recompute_cost_ms": 0.19916800316423178,
+      "recompute_cost_ms": 0.1863679988309741,
       "retained": true
     },
     {
@@ -5177,7 +5179,7 @@
         "arg0_116",
         "arg0_117"
       ],
-      "recompute_cost_ms": 0.1955840028822422,
+      "recompute_cost_ms": 0.1818079985678196,
       "retained": true
     },
     {
@@ -5198,7 +5200,7 @@
         "arg0_116",
         "arg0_117"
       ],
-      "recompute_cost_ms": 0.26828800328075886,
+      "recompute_cost_ms": 0.2462719976902008,
       "retained": true
     },
     {
@@ -5217,7 +5219,7 @@
       "required_input_names": [
         "arg0_118"
       ],
-      "recompute_cost_ms": 0.046592000871896744,
+      "recompute_cost_ms": 0.044544000178575516,
       "retained": true
     },
     {
@@ -5240,7 +5242,7 @@
         "t_42",
         "view_112"
       ],
-      "recompute_cost_ms": 1.3404159672791138,
+      "recompute_cost_ms": 1.5103520154953003,
       "retained": true
     },
     {
@@ -5261,7 +5263,7 @@
         "arg0_116",
         "arg0_117"
       ],
-      "recompute_cost_ms": 0.24115200340747833,
+      "recompute_cost_ms": 0.2534400001168251,
       "retained": true
     },
     {
@@ -5280,7 +5282,7 @@
       "required_input_names": [
         "arg0_120"
       ],
-      "recompute_cost_ms": 0.043008001521229744,
+      "recompute_cost_ms": 0.03939200006425381,
       "retained": true
     },
     {
@@ -5303,7 +5305,7 @@
         "t_43",
         "view_115"
       ],
-      "recompute_cost_ms": 1.3224960152292624,
+      "recompute_cost_ms": 1.4730240032076836,
       "retained": true
     },
     {
@@ -5324,7 +5326,7 @@
         "arg0_116",
         "arg0_117"
       ],
-      "recompute_cost_ms": 0.24524800293147564,
+      "recompute_cost_ms": 0.2247679978609085,
       "retained": true
     },
     {
@@ -5343,7 +5345,7 @@
       "required_input_names": [
         "arg0_122"
       ],
-      "recompute_cost_ms": 0.030720001086592674,
+      "recompute_cost_ms": 0.03585600107908249,
       "retained": true
     },
     {
@@ -5366,7 +5368,7 @@
         "t_44",
         "view_118"
       ],
-      "recompute_cost_ms": 1.3347680270671844,
+      "recompute_cost_ms": 1.4463999886065722,
       "retained": true
     },
     {
@@ -5387,7 +5389,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7116160021396354,
+      "recompute_cost_ms": 1.858576008118689,
       "retained": true
     },
     {
@@ -5411,7 +5413,7 @@
         "transpose_29",
         "transpose_30"
       ],
-      "recompute_cost_ms": 4.040704063139856,
+      "recompute_cost_ms": 3.8512640884146094,
       "retained": true
     },
     {
@@ -5434,7 +5436,7 @@
         "transpose_29",
         "transpose_30"
       ],
-      "recompute_cost_ms": 4.0427520629018545,
+      "recompute_cost_ms": 3.8461440885439515,
       "retained": true
     },
     {
@@ -5453,7 +5455,7 @@
         "transpose_29",
         "transpose_30"
       ],
-      "recompute_cost_ms": 4.035072063095868,
+      "recompute_cost_ms": 3.8415360879153013,
       "retained": true
     },
     {
@@ -5472,7 +5474,7 @@
         "transpose_29",
         "transpose_30"
       ],
-      "recompute_cost_ms": 4.038656063377857,
+      "recompute_cost_ms": 3.845632088370621,
       "retained": true
     },
     {
@@ -5491,7 +5493,7 @@
       "required_input_names": [
         "getitem_103"
       ],
-      "recompute_cost_ms": 0.15871999971568584,
+      "recompute_cost_ms": 0.17817600071430206,
       "retained": true
     },
     {
@@ -5510,7 +5512,7 @@
       "required_input_names": [
         "arg0_124"
       ],
-      "recompute_cost_ms": 0.044543998315930367,
+      "recompute_cost_ms": 0.0471039991825819,
       "retained": true
     },
     {
@@ -5532,7 +5534,7 @@
         "t_45",
         "view_122"
       ],
-      "recompute_cost_ms": 1.4648319790139794,
+      "recompute_cost_ms": 1.411552019417286,
       "retained": true
     },
     {
@@ -5557,7 +5559,7 @@
         "t_45",
         "view_122"
       ],
-      "recompute_cost_ms": 1.7812479780986905,
+      "recompute_cost_ms": 2.0090560084208846,
       "retained": true
     },
     {
@@ -5579,7 +5581,7 @@
         "arg0_126",
         "arg0_127"
       ],
-      "recompute_cost_ms": 0.1889280006289482,
+      "recompute_cost_ms": 0.18227200023829937,
       "retained": true
     },
     {
@@ -5601,7 +5603,7 @@
         "arg0_126",
         "arg0_127"
       ],
-      "recompute_cost_ms": 0.19200000073760748,
+      "recompute_cost_ms": 0.18174399994313717,
       "retained": true
     },
     {
@@ -5622,7 +5624,7 @@
         "arg0_126",
         "arg0_127"
       ],
-      "recompute_cost_ms": 0.2467839978635311,
+      "recompute_cost_ms": 0.22732799965888262,
       "retained": true
     },
     {
@@ -5641,7 +5643,7 @@
       "required_input_names": [
         "arg0_128"
       ],
-      "recompute_cost_ms": 0.04352000169456005,
+      "recompute_cost_ms": 0.04094400070607662,
       "retained": true
     },
     {
@@ -5663,7 +5665,7 @@
         "t_46",
         "view_124"
       ],
-      "recompute_cost_ms": 5.224464040249586,
+      "recompute_cost_ms": 7.558095892891288,
       "retained": true
     },
     {
@@ -5682,7 +5684,7 @@
       "required_input_names": [
         "view_125"
       ],
-      "recompute_cost_ms": 1.0685440227389336,
+      "recompute_cost_ms": 2.158591963350773,
       "retained": true
     },
     {
@@ -5701,7 +5703,7 @@
       "required_input_names": [
         "arg0_130"
       ],
-      "recompute_cost_ms": 0.02303999988362193,
+      "recompute_cost_ms": 0.043007999658584595,
       "retained": true
     },
     {
@@ -5723,7 +5725,7 @@
         "t_47",
         "view_126"
       ],
-      "recompute_cost_ms": 4.584448029287159,
+      "recompute_cost_ms": 4.2746881283819675,
       "retained": true
     },
     {
@@ -5748,7 +5750,7 @@
         "t_47",
         "view_126"
       ],
-      "recompute_cost_ms": 4.887552028521895,
+      "recompute_cost_ms": 4.8179201409220695,
       "retained": true
     },
     {
@@ -5770,7 +5772,7 @@
         "arg0_132",
         "arg0_133"
       ],
-      "recompute_cost_ms": 0.1776640039170161,
+      "recompute_cost_ms": 0.18431999534368515,
       "retained": true
     },
     {
@@ -5792,7 +5794,7 @@
         "arg0_132",
         "arg0_133"
       ],
-      "recompute_cost_ms": 0.18585600331425667,
+      "recompute_cost_ms": 0.18329599499702454,
       "retained": true
     },
     {
@@ -5813,7 +5815,7 @@
         "arg0_132",
         "arg0_133"
       ],
-      "recompute_cost_ms": 0.21555200370494276,
+      "recompute_cost_ms": 0.23249599523842335,
       "retained": true
     },
     {
@@ -5832,7 +5834,7 @@
       "required_input_names": [
         "arg0_134"
       ],
-      "recompute_cost_ms": 0.04044799879193306,
+      "recompute_cost_ms": 0.04507200047373772,
       "retained": true
     },
     {
@@ -5855,7 +5857,7 @@
         "t_48",
         "view_128"
       ],
-      "recompute_cost_ms": 1.3593600261956453,
+      "recompute_cost_ms": 1.475584004074335,
       "retained": true
     },
     {
@@ -5876,7 +5878,7 @@
         "arg0_132",
         "arg0_133"
       ],
-      "recompute_cost_ms": 0.22630400210618973,
+      "recompute_cost_ms": 0.22783999517560005,
       "retained": true
     },
     {
@@ -5895,7 +5897,7 @@
       "required_input_names": [
         "arg0_136"
       ],
-      "recompute_cost_ms": 0.04403200000524521,
+      "recompute_cost_ms": 0.044544000178575516,
       "retained": true
     },
     {
@@ -5918,7 +5920,7 @@
         "t_49",
         "view_131"
       ],
-      "recompute_cost_ms": 1.3450240138918161,
+      "recompute_cost_ms": 1.432607974857092,
       "retained": true
     },
     {
@@ -5939,7 +5941,7 @@
         "arg0_132",
         "arg0_133"
       ],
-      "recompute_cost_ms": 0.22681600227952003,
+      "recompute_cost_ms": 0.22427199594676495,
       "retained": true
     },
     {
@@ -5958,7 +5960,7 @@
       "required_input_names": [
         "arg0_138"
       ],
-      "recompute_cost_ms": 0.03839999996125698,
+      "recompute_cost_ms": 0.03433600068092346,
       "retained": true
     },
     {
@@ -5981,7 +5983,7 @@
         "t_50",
         "view_134"
       ],
-      "recompute_cost_ms": 1.33836798556149,
+      "recompute_cost_ms": 1.4223360307514668,
       "retained": true
     },
     {
@@ -6002,7 +6004,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7305600011022761,
+      "recompute_cost_ms": 1.9220800073817372,
       "retained": true
     },
     {
@@ -6026,7 +6028,7 @@
         "transpose_33",
         "transpose_34"
       ],
-      "recompute_cost_ms": 4.341248003765941,
+      "recompute_cost_ms": 3.9004159960895777,
       "retained": true
     },
     {
@@ -6049,7 +6051,7 @@
         "transpose_33",
         "transpose_34"
       ],
-      "recompute_cost_ms": 4.087295991834253,
+      "recompute_cost_ms": 3.879471995867789,
       "retained": true
     },
     {
@@ -6068,7 +6070,7 @@
         "transpose_33",
         "transpose_34"
       ],
-      "recompute_cost_ms": 4.088319991715252,
+      "recompute_cost_ms": 3.873279996216297,
       "retained": true
     },
     {
@@ -6087,7 +6089,7 @@
         "transpose_33",
         "transpose_34"
       ],
-      "recompute_cost_ms": 4.093951992690563,
+      "recompute_cost_ms": 3.8722559958696365,
       "retained": true
     },
     {
@@ -6106,7 +6108,7 @@
       "required_input_names": [
         "getitem_117"
       ],
-      "recompute_cost_ms": 0.14643200067803264,
+      "recompute_cost_ms": 0.260112002491951,
       "retained": true
     },
     {
@@ -6125,7 +6127,7 @@
       "required_input_names": [
         "arg0_140"
       ],
-      "recompute_cost_ms": 0.019456000649370253,
+      "recompute_cost_ms": 0.06553600169718266,
       "retained": true
     },
     {
@@ -6147,7 +6149,7 @@
         "t_51",
         "view_138"
       ],
-      "recompute_cost_ms": 1.6844800263643265,
+      "recompute_cost_ms": 2.0070239920169115,
       "retained": true
     },
     {
@@ -6172,7 +6174,7 @@
         "t_51",
         "view_138"
       ],
-      "recompute_cost_ms": 1.9768320303410292,
+      "recompute_cost_ms": 2.5773919839411974,
       "retained": true
     },
     {
@@ -6194,7 +6196,7 @@
         "arg0_142",
         "arg0_143"
       ],
-      "recompute_cost_ms": 0.15564799308776855,
+      "recompute_cost_ms": 0.1955840028822422,
       "retained": true
     },
     {
@@ -6216,7 +6218,7 @@
         "arg0_142",
         "arg0_143"
       ],
-      "recompute_cost_ms": 0.15769599378108978,
+      "recompute_cost_ms": 0.1996800024062395,
       "retained": true
     },
     {
@@ -6237,7 +6239,7 @@
         "arg0_142",
         "arg0_143"
       ],
-      "recompute_cost_ms": 0.20377599447965622,
+      "recompute_cost_ms": 0.27648000326007605,
       "retained": true
     },
     {
@@ -6256,7 +6258,7 @@
       "required_input_names": [
         "arg0_144"
       ],
-      "recompute_cost_ms": 0.03839999996125698,
+      "recompute_cost_ms": 0.055296000093221664,
       "retained": true
     },
     {
@@ -6278,7 +6280,7 @@
         "t_52",
         "view_140"
       ],
-      "recompute_cost_ms": 5.182975985109806,
+      "recompute_cost_ms": 6.071808056905866,
       "retained": true
     },
     {
@@ -6297,7 +6299,7 @@
       "required_input_names": [
         "view_141"
       ],
-      "recompute_cost_ms": 1.0751999747008085,
+      "recompute_cost_ms": 2.269183913245797,
       "retained": true
     },
     {
@@ -6316,7 +6318,7 @@
       "required_input_names": [
         "arg0_146"
       ],
-      "recompute_cost_ms": 0.025087999645620584,
+      "recompute_cost_ms": 0.10649600252509117,
       "retained": true
     },
     {
@@ -6338,7 +6340,7 @@
         "t_53",
         "view_142"
       ],
-      "recompute_cost_ms": 4.586495998315513,
+      "recompute_cost_ms": 3.8133759405463934,
       "retained": true
     },
     {
@@ -6363,7 +6365,7 @@
         "t_53",
         "view_142"
       ],
-      "recompute_cost_ms": 4.871167993173003,
+      "recompute_cost_ms": 4.390399942174554,
       "retained": true
     },
     {
@@ -6385,7 +6387,7 @@
         "arg0_148",
         "arg0_149"
       ],
-      "recompute_cost_ms": 0.2017279975116253,
+      "recompute_cost_ms": 0.1797120003029704,
       "retained": true
     },
     {
@@ -6407,7 +6409,7 @@
         "arg0_148",
         "arg0_149"
       ],
-      "recompute_cost_ms": 0.19507199665531516,
+      "recompute_cost_ms": 0.17203200235962868,
       "retained": true
     },
     {
@@ -6428,7 +6430,7 @@
         "arg0_148",
         "arg0_149"
       ],
-      "recompute_cost_ms": 0.2611199989914894,
+      "recompute_cost_ms": 0.23040000069886446,
       "retained": true
     },
     {
@@ -6447,7 +6449,7 @@
       "required_input_names": [
         "arg0_150"
       ],
-      "recompute_cost_ms": 0.06654399819672108,
+      "recompute_cost_ms": 0.1853440050035715,
       "retained": true
     },
     {
@@ -6470,7 +6472,7 @@
         "t_54",
         "view_144"
       ],
-      "recompute_cost_ms": 1.3475840333849192,
+      "recompute_cost_ms": 1.4776319973170757,
       "retained": true
     },
     {
@@ -6491,7 +6493,7 @@
         "arg0_148",
         "arg0_149"
       ],
-      "recompute_cost_ms": 0.2462719976902008,
+      "recompute_cost_ms": 0.22476800065487623,
       "retained": true
     },
     {
@@ -6510,7 +6512,7 @@
       "required_input_names": [
         "arg0_152"
       ],
-      "recompute_cost_ms": 0.035327999852597713,
+      "recompute_cost_ms": 0.04147200100123882,
       "retained": true
     },
     {
@@ -6533,7 +6535,7 @@
         "t_55",
         "view_147"
       ],
-      "recompute_cost_ms": 1.3347840011119843,
+      "recompute_cost_ms": 1.4192800037562847,
       "retained": true
     },
     {
@@ -6554,7 +6556,7 @@
         "arg0_148",
         "arg0_149"
       ],
-      "recompute_cost_ms": 0.24729599803686142,
+      "recompute_cost_ms": 0.2396160000935197,
       "retained": true
     },
     {
@@ -6573,7 +6575,7 @@
       "required_input_names": [
         "arg0_154"
       ],
-      "recompute_cost_ms": 0.03225600067526102,
+      "recompute_cost_ms": 0.04915199987590313,
       "retained": true
     },
     {
@@ -6596,7 +6598,7 @@
         "t_56",
         "view_150"
       ],
-      "recompute_cost_ms": 1.3378559704869986,
+      "recompute_cost_ms": 1.4018559698015451,
       "retained": true
     },
     {
@@ -6617,7 +6619,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.6952320077689365,
+      "recompute_cost_ms": 1.9144000122323632,
       "retained": true
     },
     {
@@ -6641,7 +6643,7 @@
         "transpose_37",
         "transpose_38"
       ],
-      "recompute_cost_ms": 4.10265601426363,
+      "recompute_cost_ms": 3.3407999323680997,
       "retained": true
     },
     {
@@ -6664,7 +6666,7 @@
         "transpose_37",
         "transpose_38"
       ],
-      "recompute_cost_ms": 4.079616013914347,
+      "recompute_cost_ms": 3.333119932562113,
       "retained": true
     },
     {
@@ -6683,7 +6685,7 @@
         "transpose_37",
         "transpose_38"
       ],
-      "recompute_cost_ms": 4.081152014434338,
+      "recompute_cost_ms": 3.331583932042122,
       "retained": true
     },
     {
@@ -6702,7 +6704,7 @@
         "transpose_37",
         "transpose_38"
       ],
-      "recompute_cost_ms": 4.082176013849676,
+      "recompute_cost_ms": 3.3310719318687916,
       "retained": true
     },
     {
@@ -6721,7 +6723,7 @@
       "required_input_names": [
         "getitem_131"
       ],
-      "recompute_cost_ms": 0.15923199988901615,
+      "recompute_cost_ms": 0.16030400060117245,
       "retained": true
     },
     {
@@ -6740,7 +6742,7 @@
       "required_input_names": [
         "arg0_156"
       ],
-      "recompute_cost_ms": 0.043007999658584595,
+      "recompute_cost_ms": 0.03891199827194214,
       "retained": true
     },
     {
@@ -6762,7 +6764,7 @@
         "t_57",
         "view_154"
       ],
-      "recompute_cost_ms": 1.414655989035964,
+      "recompute_cost_ms": 1.336832007393241,
       "retained": true
     },
     {
@@ -6787,7 +6789,7 @@
         "t_57",
         "view_154"
       ],
-      "recompute_cost_ms": 1.7418239880353212,
+      "recompute_cost_ms": 1.9322879957035184,
       "retained": true
     },
     {
@@ -6809,7 +6811,7 @@
         "arg0_158",
         "arg0_159"
       ],
-      "recompute_cost_ms": 0.18329599732533097,
+      "recompute_cost_ms": 0.18219200056046247,
       "retained": true
     },
     {
@@ -6831,7 +6833,7 @@
         "arg0_158",
         "arg0_159"
       ],
-      "recompute_cost_ms": 0.18943999707698822,
+      "recompute_cost_ms": 0.18475200049579144,
       "retained": true
     },
     {
@@ -6852,7 +6854,7 @@
         "arg0_158",
         "arg0_159"
       ],
-      "recompute_cost_ms": 0.24319999758154154,
+      "recompute_cost_ms": 0.24983999971300364,
       "retained": true
     },
     {
@@ -6871,7 +6873,7 @@
       "required_input_names": [
         "arg0_160"
       ],
-      "recompute_cost_ms": 0.03839999996125698,
+      "recompute_cost_ms": 0.04505600035190582,
       "retained": true
     },
     {
@@ -6893,7 +6895,7 @@
         "t_58",
         "view_156"
       ],
-      "recompute_cost_ms": 5.213183926418424,
+      "recompute_cost_ms": 6.021120076999068,
       "retained": true
     },
     {
@@ -6912,7 +6914,7 @@
       "required_input_names": [
         "view_157"
       ],
-      "recompute_cost_ms": 1.0577760115265846,
+      "recompute_cost_ms": 2.191871903836727,
       "retained": true
     },
     {
@@ -6931,7 +6933,7 @@
       "required_input_names": [
         "arg0_162"
       ],
-      "recompute_cost_ms": 0.023552000056952238,
+      "recompute_cost_ms": 0.046592000871896744,
       "retained": true
     },
     {
@@ -6953,7 +6955,7 @@
         "t_59",
         "view_158"
       ],
-      "recompute_cost_ms": 4.321792092174292,
+      "recompute_cost_ms": 3.763711883686483,
       "retained": true
     },
     {
@@ -6978,7 +6980,7 @@
         "t_59",
         "view_158"
       ],
-      "recompute_cost_ms": 4.607488090754487,
+      "recompute_cost_ms": 4.306415883824229,
       "retained": true
     },
     {
@@ -7000,7 +7002,7 @@
         "arg0_164",
         "arg0_165"
       ],
-      "recompute_cost_ms": 0.17561599984765053,
+      "recompute_cost_ms": 0.17974399775266647,
       "retained": true
     },
     {
@@ -7022,7 +7024,7 @@
         "arg0_164",
         "arg0_165"
       ],
-      "recompute_cost_ms": 0.1740799993276596,
+      "recompute_cost_ms": 0.17923199757933617,
       "retained": true
     },
     {
@@ -7043,7 +7045,7 @@
         "arg0_164",
         "arg0_165"
       ],
-      "recompute_cost_ms": 0.21759999974165112,
+      "recompute_cost_ms": 0.22783999796956778,
       "retained": true
     },
     {
@@ -7062,7 +7064,7 @@
       "required_input_names": [
         "arg0_166"
       ],
-      "recompute_cost_ms": 0.03379200119525194,
+      "recompute_cost_ms": 0.04460799880325794,
       "retained": true
     },
     {
@@ -7085,7 +7087,7 @@
         "t_60",
         "view_160"
       ],
-      "recompute_cost_ms": 1.2195839677006006,
+      "recompute_cost_ms": 1.4274400137364864,
       "retained": true
     },
     {
@@ -7106,7 +7108,7 @@
         "arg0_164",
         "arg0_165"
       ],
-      "recompute_cost_ms": 0.20684800168965012,
+      "recompute_cost_ms": 0.22319999802857637,
       "retained": true
     },
     {
@@ -7125,7 +7127,7 @@
       "required_input_names": [
         "arg0_168"
       ],
-      "recompute_cost_ms": 0.05990399979054928,
+      "recompute_cost_ms": 0.03686400130391121,
       "retained": true
     },
     {
@@ -7148,7 +7150,7 @@
         "t_61",
         "view_163"
       ],
-      "recompute_cost_ms": 1.1735040359199047,
+      "recompute_cost_ms": 1.4126080349087715,
       "retained": true
     },
     {
@@ -7169,7 +7171,7 @@
         "arg0_164",
         "arg0_165"
       ],
-      "recompute_cost_ms": 0.20684799982700497,
+      "recompute_cost_ms": 0.2324479976668954,
       "retained": true
     },
     {
@@ -7188,7 +7190,7 @@
       "required_input_names": [
         "arg0_170"
       ],
-      "recompute_cost_ms": 0.04607999883592129,
+      "recompute_cost_ms": 0.04608000069856644,
       "retained": true
     },
     {
@@ -7211,7 +7213,7 @@
         "t_62",
         "view_166"
       ],
-      "recompute_cost_ms": 1.1719680046662688,
+      "recompute_cost_ms": 1.3957280311733484,
       "retained": true
     },
     {
@@ -7232,7 +7234,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.664000007440336,
+      "recompute_cost_ms": 1.8739680079743266,
       "retained": true
     },
     {
@@ -7256,7 +7258,7 @@
         "transpose_41",
         "transpose_42"
       ],
-      "recompute_cost_ms": 3.645439867861569,
+      "recompute_cost_ms": 3.34847988281399,
       "retained": true
     },
     {
@@ -7279,7 +7281,7 @@
         "transpose_41",
         "transpose_42"
       ],
-      "recompute_cost_ms": 3.636223867535591,
+      "recompute_cost_ms": 3.3469438832253218,
       "retained": true
     },
     {
@@ -7298,7 +7300,7 @@
         "transpose_41",
         "transpose_42"
       ],
-      "recompute_cost_ms": 3.6346878674812615,
+      "recompute_cost_ms": 3.342847882770002,
       "retained": true
     },
     {
@@ -7317,7 +7319,7 @@
         "transpose_41",
         "transpose_42"
       ],
-      "recompute_cost_ms": 3.637759868055582,
+      "recompute_cost_ms": 3.344895883463323,
       "retained": true
     },
     {
@@ -7336,7 +7338,7 @@
       "required_input_names": [
         "getitem_145"
       ],
-      "recompute_cost_ms": 0.14592000097036362,
+      "recompute_cost_ms": 0.1837920006364584,
       "retained": true
     },
     {
@@ -7355,7 +7357,7 @@
       "required_input_names": [
         "arg0_172"
       ],
-      "recompute_cost_ms": 0.025600000051781535,
+      "recompute_cost_ms": 0.04761600121855736,
       "retained": true
     },
     {
@@ -7377,7 +7379,7 @@
         "t_63",
         "view_170"
       ],
-      "recompute_cost_ms": 1.526272026821971,
+      "recompute_cost_ms": 1.7715199869126081,
       "retained": true
     },
     {
@@ -7402,7 +7404,7 @@
         "t_63",
         "view_170"
       ],
-      "recompute_cost_ms": 1.7914880259195343,
+      "recompute_cost_ms": 2.2937599821016192,
       "retained": true
     },
     {
@@ -7424,7 +7426,7 @@
         "arg0_174",
         "arg0_175"
       ],
-      "recompute_cost_ms": 0.18227199837565422,
+      "recompute_cost_ms": 0.1725440016016364,
       "retained": true
     },
     {
@@ -7446,7 +7448,7 @@
         "arg0_174",
         "arg0_175"
       ],
-      "recompute_cost_ms": 0.17919999733567238,
+      "recompute_cost_ms": 0.17049600090831518,
       "retained": true
     },
     {
@@ -7467,7 +7469,7 @@
         "arg0_174",
         "arg0_175"
       ],
-      "recompute_cost_ms": 0.22271999903023243,
+      "recompute_cost_ms": 0.21968000289052725,
       "retained": true
     },
     {
@@ -7486,7 +7488,7 @@
       "required_input_names": [
         "arg0_176"
       ],
-      "recompute_cost_ms": 0.03737599961459637,
+      "recompute_cost_ms": 0.044495999813079834,
       "retained": true
     },
     {
@@ -7508,7 +7510,7 @@
         "t_64",
         "view_172"
       ],
-      "recompute_cost_ms": 4.669440019875765,
+      "recompute_cost_ms": 5.890559995546937,
       "retained": true
     },
     {
@@ -7527,7 +7529,7 @@
       "required_input_names": [
         "view_173"
       ],
-      "recompute_cost_ms": 1.0449919737875462,
+      "recompute_cost_ms": 8.264704376459122,
       "retained": true
     },
     {
@@ -7546,7 +7548,7 @@
       "required_input_names": [
         "arg0_178"
       ],
-      "recompute_cost_ms": 0.03839999996125698,
+      "recompute_cost_ms": 0.04710400104522705,
       "retained": true
     },
     {
@@ -7568,7 +7570,7 @@
         "t_65",
         "view_174"
       ],
-      "recompute_cost_ms": 4.07142394897528,
+      "recompute_cost_ms": 3.7242880389094353,
       "retained": true
     },
     {
@@ -7593,7 +7595,7 @@
         "t_65",
         "view_174"
       ],
-      "recompute_cost_ms": 4.356095947790891,
+      "recompute_cost_ms": 4.257280031219125,
       "retained": true
     },
     {
@@ -7615,7 +7617,7 @@
         "arg0_180",
         "arg0_181"
       ],
-      "recompute_cost_ms": 0.17254400067031384,
+      "recompute_cost_ms": 0.17508799582719803,
       "retained": true
     },
     {
@@ -7637,7 +7639,7 @@
         "arg0_180",
         "arg0_181"
       ],
-      "recompute_cost_ms": 0.17715200036764145,
+      "recompute_cost_ms": 0.17503999546170235,
       "retained": true
     },
     {
@@ -7658,7 +7660,7 @@
         "arg0_180",
         "arg0_181"
       ],
-      "recompute_cost_ms": 0.23347199894487858,
+      "recompute_cost_ms": 0.23451199661940336,
       "retained": true
     },
     {
@@ -7677,7 +7679,7 @@
       "required_input_names": [
         "arg0_182"
       ],
-      "recompute_cost_ms": 0.03891200013458729,
+      "recompute_cost_ms": 0.04249600134789944,
       "retained": true
     },
     {
@@ -7700,7 +7702,7 @@
         "t_66",
         "view_176"
       ],
-      "recompute_cost_ms": 1.2185759618878365,
+      "recompute_cost_ms": 1.4397439863532782,
       "retained": true
     },
     {
@@ -7721,7 +7723,7 @@
         "arg0_180",
         "arg0_181"
       ],
-      "recompute_cost_ms": 0.22271999903023243,
+      "recompute_cost_ms": 0.22372799646109343,
       "retained": true
     },
     {
@@ -7740,7 +7742,7 @@
       "required_input_names": [
         "arg0_184"
       ],
-      "recompute_cost_ms": 0.029184000566601753,
+      "recompute_cost_ms": 0.038863999769091606,
       "retained": true
     },
     {
@@ -7763,7 +7765,7 @@
         "t_67",
         "view_179"
       ],
-      "recompute_cost_ms": 1.1832320098765194,
+      "recompute_cost_ms": 1.381376013159752,
       "retained": true
     },
     {
@@ -7784,7 +7786,7 @@
         "arg0_180",
         "arg0_181"
       ],
-      "recompute_cost_ms": 0.22220800071954727,
+      "recompute_cost_ms": 0.22372799646109343,
       "retained": true
     },
     {
@@ -7803,7 +7805,7 @@
       "required_input_names": [
         "arg0_186"
       ],
-      "recompute_cost_ms": 0.03686399944126606,
+      "recompute_cost_ms": 0.03635199926793575,
       "retained": true
     },
     {
@@ -7826,7 +7828,7 @@
         "t_68",
         "view_182"
       ],
-      "recompute_cost_ms": 1.1729919891804457,
+      "recompute_cost_ms": 1.370623979717493,
       "retained": true
     },
     {
@@ -7847,7 +7849,7 @@
       "required_input_names": [
         "arg3_4"
       ],
-      "recompute_cost_ms": 1.7218560018809512,
+      "recompute_cost_ms": 1.8688480081036687,
       "retained": true
     },
     {
@@ -7871,7 +7873,7 @@
         "transpose_45",
         "transpose_46"
       ],
-      "recompute_cost_ms": 3.6444161059334874,
+      "recompute_cost_ms": 3.3346720235422254,
       "retained": true
     },
     {
@@ -7894,7 +7896,7 @@
         "transpose_45",
         "transpose_46"
       ],
-      "recompute_cost_ms": 3.6239361059851944,
+      "recompute_cost_ms": 3.329536024481058,
       "retained": true
     },
     {
@@ -7913,7 +7915,7 @@
         "transpose_45",
         "transpose_46"
       ],
-      "recompute_cost_ms": 3.6362241059541702,
+      "recompute_cost_ms": 3.3341440241783857,
       "retained": true
     },
     {
@@ -7932,7 +7934,7 @@
         "transpose_45",
         "transpose_46"
       ],
-      "recompute_cost_ms": 3.6357121067121625,
+      "recompute_cost_ms": 3.328000023961067,
       "retained": true
     },
     {
@@ -7951,7 +7953,7 @@
       "required_input_names": [
         "getitem_159"
       ],
-      "recompute_cost_ms": 0.12851200066506863,
+      "recompute_cost_ms": 0.16076800040900707,
       "retained": true
     },
     {
@@ -7970,7 +7972,7 @@
       "required_input_names": [
         "arg0_188"
       ],
-      "recompute_cost_ms": 0.03891200013458729,
+      "recompute_cost_ms": 0.04039999842643738,
       "retained": true
     },
     {
@@ -7992,7 +7994,7 @@
         "t_69",
         "view_186"
       ],
-      "recompute_cost_ms": 1.3045920189470053,
+      "recompute_cost_ms": 1.2472960017621517,
       "retained": true
     },
     {
@@ -8017,7 +8019,7 @@
         "t_69",
         "view_186"
       ],
-      "recompute_cost_ms": 1.6066720187664032,
+      "recompute_cost_ms": 1.8406079905107617,
       "retained": true
     },
     {
@@ -8039,7 +8041,7 @@
         "arg0_190",
         "arg0_191"
       ],
-      "recompute_cost_ms": 0.18636800162494183,
+      "recompute_cost_ms": 0.1812480017542839,
       "retained": true
     },
     {
@@ -8061,7 +8063,7 @@
         "arg0_190",
         "arg0_191"
       ],
-      "recompute_cost_ms": 0.17971200123429298,
+      "recompute_cost_ms": 0.1817600019276142,
       "retained": true
     },
     {
@@ -8082,7 +8084,7 @@
         "arg0_190",
         "arg0_191"
       ],
-      "recompute_cost_ms": 0.22323200257960707,
+      "recompute_cost_ms": 0.23756800219416618,
       "retained": true
     },
     {
@@ -8101,7 +8103,7 @@
       "required_input_names": [
         "arg0_192"
       ],
-      "recompute_cost_ms": 0.044544000178575516,
+      "recompute_cost_ms": 0.04198400117456913,
       "retained": true
     },
     {
@@ -8123,7 +8125,7 @@
         "t_70",
         "view_188"
       ],
-      "recompute_cost_ms": 4.7508480828255415,
+      "recompute_cost_ms": 6.006784226745367,
       "retained": true
     },
     {
@@ -8142,7 +8144,7 @@
       "required_input_names": [
         "view_189"
       ],
-      "recompute_cost_ms": 1.0337280221283436,
+      "recompute_cost_ms": 2.177023973315954,
       "retained": true
     },
     {
@@ -8161,7 +8163,7 @@
       "required_input_names": [
         "arg0_194"
       ],
-      "recompute_cost_ms": 0.03891200013458729,
+      "recompute_cost_ms": 0.04505600035190582,
       "retained": true
     },
     {
@@ -8183,7 +8185,7 @@
         "t_71",
         "view_190"
       ],
-      "recompute_cost_ms": 4.060160040389746,
+      "recompute_cost_ms": 3.793920001015067,
       "retained": true
     },
     {
@@ -8208,7 +8210,7 @@
         "t_71",
         "view_190"
       ],
-      "recompute_cost_ms": 4.5629440328339115,
+      "recompute_cost_ms": 4.339712013490498,
       "retained": true
     },
     {
@@ -8230,7 +8232,7 @@
         "arg0_196",
         "arg0_197"
       ],
-      "recompute_cost_ms": 1.0388479982502759,
+      "recompute_cost_ms": 0.1714719980955124,
       "retained": true
     },
     {
@@ -8252,7 +8254,7 @@
         "arg0_196",
         "arg0_197"
       ],
-      "recompute_cost_ms": 1.0521599985659122,
+      "recompute_cost_ms": 0.17203199863433838,
       "retained": true
     },
     {
@@ -8273,7 +8275,7 @@
         "arg0_196",
         "arg0_197"
       ],
-      "recompute_cost_ms": 1.0956799971172586,
+      "recompute_cost_ms": 0.2288639983162284,
       "retained": true
     },
     {
@@ -8292,7 +8294,7 @@
       "required_input_names": [
         "arg0_199"
       ],
-      "recompute_cost_ms": 0.04710400104522705,
+      "recompute_cost_ms": 0.04864000156521797,
       "retained": true
     },
     {
@@ -8314,7 +8316,7 @@
         "t_72",
         "view_192"
       ],
-      "recompute_cost_ms": 7.88326377235353,
+      "recompute_cost_ms": 1.3706079870462418,
       "retained": true
     },
     {
@@ -8334,7 +8336,7 @@
       "required_input_names": [
         "view_193"
       ],
-      "recompute_cost_ms": 0.6722560096532106,
+      "recompute_cost_ms": 0.37171199545264244,
       "retained": true
     },
     {
@@ -8356,7 +8358,7 @@
         "arg0_202",
         "gelu_12"
       ],
-      "recompute_cost_ms": 1.105919973924756,
+      "recompute_cost_ms": 0.18272000458091497,
       "retained": true
     },
     {
@@ -8378,7 +8380,7 @@
         "arg0_202",
         "gelu_12"
       ],
-      "recompute_cost_ms": 1.0941439741291106,
+      "recompute_cost_ms": 0.18169600423425436,
       "retained": true
     },
     {
@@ -8399,7 +8401,7 @@
         "arg0_202",
         "gelu_12"
       ],
-      "recompute_cost_ms": 1.1550399754196405,
+      "recompute_cost_ms": 0.2313600042834878,
       "retained": true
     },
     {
@@ -8418,7 +8420,7 @@
       "required_input_names": [
         "arg0_203"
       ],
-      "recompute_cost_ms": 0.03993599861860275,
+      "recompute_cost_ms": 0.04707200080156326,
       "retained": true
     },
     {
@@ -8436,7 +8438,7 @@
       "required_input_names": [
         "arg3_5"
       ],
-      "recompute_cost_ms": 0.04607999883592129,
+      "recompute_cost_ms": 0.050223998725414276,
       "retained": true
     },
     {
@@ -8457,7 +8459,7 @@
         "t_73",
         "view_194"
       ],
-      "recompute_cost_ms": 34.70950356684625,
+      "recompute_cost_ms": 9.2308319658041,
       "retained": true
     },
     {
@@ -8474,7 +8476,7 @@
         "_log_softmax",
         "view_197"
       ],
-      "recompute_cost_ms": 0.176640001591295,
+      "recompute_cost_ms": 0.21091200783848763,
       "retained": true
     },
     {
@@ -8491,7 +8493,7 @@
         "_log_softmax",
         "view_197"
       ],
-      "recompute_cost_ms": 0.3804160011932254,
+      "recompute_cost_ms": 0.41011200938373804,
       "retained": true
     }
   ]

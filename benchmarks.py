@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
@@ -18,7 +18,6 @@ import torch.fx as fx
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.checkpoint import checkpoint
 from torchvision.models import resnet152
 from transformers import BertConfig, BertForMaskedLM
 
@@ -27,13 +26,15 @@ from activation_checkpoint import (
     ActivationCheckpointPlan,
     activation_checkpointing,
 )
-from graph_prof import GraphProfiler, ProfilerSummary
+from graph_prof import GraphProfiler
 from graph_tracer import SEPFunction, compile
 
 
 DEFAULT_OUTPUT_DIR = Path("outputs")
 
 
+# Per-run artifact and measurement record. One RunResult corresponds to one
+# model, one batch size, and either baseline or activation-checkpointed mode.
 @dataclass
 class RunResult:
     model_name: str
@@ -46,12 +47,12 @@ class RunResult:
     correctness_ok: Optional[bool]
     output_dir: str
     profiler_summary_path: str
-    profiler_breakdown_plot: str
     plan_path: Optional[str] = None
     rewritten_profiler_summary_path: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# Sweep-level record collecting all batch-size runs for a model.
 @dataclass
 class SweepResult:
     model_name: str
@@ -59,6 +60,7 @@ class SweepResult:
     output_dir: str
     memory_plot: str
     latency_plot: str
+    breakdown_plot: Optional[str] = None
 
 
 def _device() -> torch.device:
@@ -66,6 +68,7 @@ def _device() -> torch.device:
 
 
 def _optimizer_kwargs(device: torch.device) -> Dict[str, Any]:
+    # capturable=True is required for CUDA Adam when the optimizer step is traced.
     if device.type == "cuda":
         return {"capturable": True, "foreach": True}
     return {"foreach": True}
@@ -77,6 +80,13 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"Unsupported JSON value {type(value)}")
 
 
+def _cleanup_memory(device: torch.device) -> None:
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
+
+# one model/batch-size experiment
 class Experiment:
     model_names = ["ResNet-152", "BERT"]
     default_batch_sizes: Dict[str, List[int]] = {
@@ -124,6 +134,8 @@ class Experiment:
         )
 
     def _build_bert(self) -> BertForMaskedLM:
+        # Build BERT from config rather than downloading pretrained weights.
+        # debug_bert preserves the benchmark path while making iterations faster.
         if self.debug_bert:
             config = BertConfig(
                 vocab_size=self.vocab_size,
@@ -145,16 +157,18 @@ class Experiment:
         return BertForMaskedLM(config)
 
     def _make_resnet_batch(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Synthetic image classification batch
         images = torch.randn(batch_size, 3, self.image_size, self.image_size, device=self.device)
-        targets = torch.randint(0, 1000, (batch_size,), device=self.device)
+        targets = torch.randint(0, 1000, (batch_size,), device=self.device) #graph-level
         return images, targets
 
     def _make_bert_batch(self, batch_size: int) -> Dict[str, torch.Tensor]:
+        # Synthetic masked-language-modeling batch
         input_ids = torch.randint(
             0, self.vocab_size, (batch_size, self.seq_len), device=self.device
         )
         attention_mask = torch.ones_like(input_ids, device=self.device)
-        labels = input_ids.clone()
+        labels = input_ids.clone() #mirror input_ids so the model produces a valid training loss
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -174,62 +188,21 @@ class Experiment:
         optimizer.step()
         optimizer.zero_grad()
 
-    def _resnet_forward_checkpointed(self, model: nn.Module, images: torch.Tensor) -> torch.Tensor:
-        x = model.conv1(images)
-        x = model.bn1(x)
-        x = model.relu(x)
-        x = model.maxpool(x)
-        for stage in (model.layer1, model.layer2, model.layer3, model.layer4):
-            for block in stage:
-                x = checkpoint(block, x, use_reentrant=False, preserve_rng_state=False)
-        x = model.avgpool(x)
-        x = torch.flatten(x, 1)
-        return model.fc(x)
-
     def _bert_train_step(
         self,
         model: nn.Module,
         optimizer: optim.Optimizer,
         batch: Dict[str, torch.Tensor],
     ) -> None:
+        # HuggingFace model returns the loss directly when labels are supplied.
         outputs = model(**batch)
         loss = SEPFunction.apply(outputs.loss)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
-    def _enable_runtime_checkpointing(self) -> None:
-        if self.model_name != "BERT":
-            return
-        self.model.config.use_cache = False
-        try:
-            self.model.gradient_checkpointing_enable(
-                gradient_checkpointing_kwargs={
-                    "use_reentrant": False,
-                    "preserve_rng_state": False,
-                }
-            )
-        except TypeError:
-            self.model.gradient_checkpointing_enable()
-
-    def _eager_train_step(self, use_activation_checkpointing: bool, batch: Any) -> None:
-        self.model.train()
-        self.optimizer.zero_grad(set_to_none=True)
-        if self.model_name == "ResNet-152":
-            images, targets = batch
-            logits = (
-                self._resnet_forward_checkpointed(self.model, images)
-                if use_activation_checkpointing
-                else self.model(images)
-            )
-            loss = F.cross_entropy(logits, targets)
-        else:
-            outputs = self.model(**batch)
-            loss = outputs.loss
-        loss.backward()
-        self.optimizer.step()
-
     def init_opt_states(self) -> None:
+        # Adam creates state lazily
         for param in self.model.parameters():
             if param.requires_grad:
                 param.grad = torch.rand_like(param)
@@ -237,29 +210,13 @@ class Experiment:
         self.optimizer.zero_grad()
 
     def _new_batch_like(self) -> Any:
+        # fresh synthetic batches
         if self.model_name == "ResNet-152":
             return self._make_resnet_batch(self.batch_size)
         return self._make_bert_batch(self.batch_size)
 
-    def _plot_peak_memory_breakdown(self, summary: ProfilerSummary, output_path: Path) -> Path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        labels = ["Parameters", "Gradients", "Optimizer", "Activations"]
-        values = [
-            summary.peak_breakdown_bytes["parameter_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["gradient_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["optimizer_state_bytes"] / (1024**2),
-            summary.peak_breakdown_bytes["activation_bytes"] / (1024**2),
-        ]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.bar(labels, values, color=["#365c8d", "#4ac16d", "#d08c60", "#b33f62"])
-        ax.set_ylabel("Memory (MB)")
-        ax.set_title(f"Peak Memory Breakdown: {self.model_name} (bs={self.batch_size})")
-        fig.tight_layout()
-        fig.savefig(output_path)
-        plt.close(fig)
-        return output_path
-
     def _write_json(self, payload: Dict[str, Any], path: Path) -> Path:
+        # Centralized JSON writer for plan/manifest/error artifacts.
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, default=_json_default), encoding="utf-8")
         return path
@@ -270,6 +227,8 @@ class Experiment:
         iterations: int = 3,
         warmup_iterations: int = 1,
     ) -> Tuple[List[float], List[int]]:
+        # Time repeated executions of the already-compiled graph. CUDA runs also
+        # record allocator peak memory for each measured iteration.
         latencies: List[float] = []
         peaks: List[int] = []
         gc.collect()
@@ -279,45 +238,13 @@ class Experiment:
         for _ in range(warmup_iterations):
             compiled_fn(self.model, self.optimizer, self._new_batch_like())
         for _ in range(iterations):
+            # Reset CUDA peak stats for each iteration so max_memory_allocated is
+            # attributable to that iteration rather than the whole process.
             if self.device.type == "cuda":
                 torch.cuda.reset_peak_memory_stats()
                 torch.cuda.synchronize()
             start = time.perf_counter()
             compiled_fn(self.model, self.optimizer, self._new_batch_like())
-            if self.device.type == "cuda":
-                torch.cuda.synchronize()
-                peaks.append(torch.cuda.max_memory_allocated())
-            else:
-                peaks.append(0)
-            latencies.append((time.perf_counter() - start) * 1000.0)
-        return latencies, peaks
-
-    def _measure_eager_training(
-        self,
-        use_activation_checkpointing: bool,
-        iterations: int = 3,
-        warmup_iterations: int = 1,
-    ) -> Tuple[List[float], List[int]]:
-        if use_activation_checkpointing:
-            self._enable_runtime_checkpointing()
-
-        latencies: List[float] = []
-        peaks: List[int] = []
-        gc.collect()
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
-
-        for _ in range(warmup_iterations):
-            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
-
-        for _ in range(iterations):
-            if self.device.type == "cuda":
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()
-                torch.cuda.synchronize()
-            start = time.perf_counter()
-            self._eager_train_step(use_activation_checkpointing, self._new_batch_like())
             if self.device.type == "cuda":
                 torch.cuda.synchronize()
                 peaks.append(torch.cuda.max_memory_allocated())
@@ -332,11 +259,13 @@ class Experiment:
         original_gm: fx.GraphModule,
         flat_args: List[torch.Tensor],
     ) -> bool:
+        # Compare original and rewritten GraphModule outputs on identical flat inputs
         with torch.no_grad():
             baseline = original_gm(*flat_args)
             transformed = transformed_gm(*flat_args)
 
         def flatten(value: Any) -> Iterable[torch.Tensor]:
+            # Graph outputs may be nested
             if isinstance(value, torch.Tensor):
                 yield value
                 return
@@ -356,6 +285,8 @@ class Experiment:
         checkpoint_config: Optional[ActivationCheckpointConfig] = None,
         profiler_iters: int = 2,
     ) -> RunResult:
+        # Execute one baseline or activation-checkpointed run and write the
+        # artifacts needed for later analysis/demo.
         self.init_opt_states()
         metadata: Dict[str, Any] = {
             "device": str(self.device),
@@ -363,7 +294,7 @@ class Experiment:
             "vocab_size": self.vocab_size if self.model_name == "BERT" else None,
             "image_size": self.image_size if self.model_name == "ResNet-152" else None,
             "debug_bert": self.debug_bert,
-            "measurement_mode": "eager_runtime_checkpointing",
+            "measurement_mode": "custom_fx_graph_rewrite",
         }
         artifacts_dir = self.output_dir / ("ac" if use_activation_checkpointing else "baseline")
         artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -371,6 +302,8 @@ class Experiment:
         capture: Dict[str, Any] = {}
 
         def graph_transformation(gm: fx.GraphModule, args: Any) -> fx.GraphModule:
+            # This callback runs exactly once, immediately after tracing and
+            # before benchmark timing starts.
             profiler = GraphProfiler(gm)
             with torch.no_grad():
                 for _ in range(profiler_iters):
@@ -378,20 +311,18 @@ class Experiment:
             profiler.aggregate_stats()
             summary = profiler.latest_summary or profiler.build_summary()
             summary_path = profiler.export_summary(artifacts_dir / "profiler_summary.json")
-            breakdown_path = self._plot_peak_memory_breakdown(
-                summary, artifacts_dir / "peak_memory_breakdown.png"
-            )
             capture["profiler"] = profiler
             capture["summary"] = summary
             capture["summary_path"] = summary_path
-            capture["breakdown_path"] = breakdown_path
             capture["flat_args"] = args
             gm._ac_run_with_interpreter = True
 
             if not use_activation_checkpointing:
+                # Baseline keeps the traced graph unchanged
                 capture["correctness_ok"] = None
                 return gm
 
+            # Rewrite a copy of the traced graph according to the checkpoint plan, then validate it
             original_gm = copy.deepcopy(gm)
             rewritten_gm, plan = activation_checkpointing(
                 gm, profiler, checkpoint_config or ActivationCheckpointConfig()
@@ -408,20 +339,36 @@ class Experiment:
             capture["correctness_ok"] = self._validate_correctness(
                 rewritten_gm, original_gm, args
             )
-            rewritten_profiler = GraphProfiler(rewritten_gm)
-            with torch.no_grad():
-                for _ in range(profiler_iters):
-                    rewritten_profiler.run(*args)
-            rewritten_profiler.aggregate_stats()
-            capture["rewritten_summary_path"] = rewritten_profiler.export_summary(
-                artifacts_dir / "rewritten_profiler_summary.json"
-            )
+            _cleanup_memory(self.device)
+            try:
+                # Profile the rewritten graph too
+                rewritten_profiler = GraphProfiler(rewritten_gm)
+                with torch.no_grad():
+                    for _ in range(profiler_iters):
+                        rewritten_profiler.run(*args)
+                rewritten_profiler.aggregate_stats()
+                capture["rewritten_summary_path"] = rewritten_profiler.export_summary(
+                    artifacts_dir / "rewritten_profiler_summary.json"
+                )
+            except torch.OutOfMemoryError as exc:
+                _cleanup_memory(self.device)
+                capture["rewritten_summary_path"] = None
+                self._write_json(
+                    {
+                        "error": "rewritten_profiler_oom",
+                        "message": str(exc).splitlines()[0],
+                        "plan_recompute_count": len(plan.recompute),
+                    },
+                    artifacts_dir / "rewritten_profiler_summary_error.json",
+                )
             rewritten_gm._ac_run_with_interpreter = True
             return rewritten_gm
 
         compiled_fn = compile(self.train_step, graph_transformation)
+        # First call triggers tracing/profiling/rewrite. Later calls are measured.
         compiled_fn(self.model, self.optimizer, self.example_inputs)
-        latencies, peaks = self._measure_eager_training(use_activation_checkpointing)
+        _cleanup_memory(self.device)
+        latencies, peaks = self._measure_compiled_fn(compiled_fn)
 
         return RunResult(
             model_name=self.model_name,
@@ -434,7 +381,6 @@ class Experiment:
             correctness_ok=capture.get("correctness_ok"),
             output_dir=str(artifacts_dir),
             profiler_summary_path=str(capture["summary_path"]),
-            profiler_breakdown_plot=str(capture["breakdown_path"]),
             plan_path=str(capture["plan_path"]) if "plan_path" in capture else None,
             rewritten_profiler_summary_path=(
                 str(capture["rewritten_summary_path"])
@@ -446,6 +392,7 @@ class Experiment:
 
 
 def _write_csv(rows: List[Dict[str, Any]], path: Path) -> Path:
+    # Persist sweep-level tabular results for plotting and later analysis.
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         return path
@@ -530,6 +477,105 @@ def _plot_sweep(
     return output_path
 
 
+def _load_peak_breakdown(run: RunResult) -> Dict[str, float]:
+    # AC runs prefer the rewritten graph summary when available because that is
+    # the artifact that reflects recomputation after graph mutation.
+    summary_path = (
+        run.rewritten_profiler_summary_path
+        if run.use_activation_checkpointing and run.rewritten_profiler_summary_path
+        else run.profiler_summary_path
+    )
+    payload = json.loads(Path(summary_path).read_text(encoding="utf-8"))
+    breakdown = payload["peak_breakdown_bytes"]
+    return {
+        "Parameters": breakdown.get("parameter_bytes", 0) / (1024**2),
+        "Gradients": breakdown.get("gradient_bytes", 0) / (1024**2),
+        "Optimizer": breakdown.get("optimizer_state_bytes", 0) / (1024**2),
+        "Activations": breakdown.get("activation_bytes", 0) / (1024**2),
+    }
+
+
+def _plot_peak_memory_breakdown_sweep(
+    runs: List[RunResult],
+    model_name: str,
+    output_path: Path,
+) -> Path:
+    # One stacked chart makes it easier to compare baseline and AC across batch
+    # sizes than separate per-run breakdown images.
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    batch_sizes = sorted({run.batch_size for run in runs})
+    run_by_key = {
+        (run.batch_size, run.use_activation_checkpointing): run for run in runs
+    }
+    categories = ["Parameters", "Gradients", "Optimizer", "Activations"]
+    colors = {
+        "Parameters": "#365c8d",
+        "Gradients": "#4ac16d",
+        "Optimizer": "#d08c60",
+        "Activations": "#b33f62",
+    }
+    fig, ax = plt.subplots(figsize=(max(7, 1.8 * len(batch_sizes)), 4.5))
+    width = 0.36
+    x_positions = list(range(len(batch_sizes)))
+    mode_specs = [
+        (False, "Baseline", -width / 2),
+        (True, "AC", width / 2),
+    ]
+    legend_seen: Set[str] = set()
+
+    for use_ac, mode_label, offset in mode_specs:
+        xs = [pos + offset for pos in x_positions]
+        bottoms = [0.0 for _ in batch_sizes]
+        values_by_category = {category: [] for category in categories}
+        for batch_size in batch_sizes:
+            run = run_by_key.get((batch_size, use_ac))
+            breakdown = (
+                _load_peak_breakdown(run)
+                if run is not None
+                else {category: 0.0 for category in categories}
+            )
+            for category in categories:
+                values_by_category[category].append(breakdown[category])
+
+        for category in categories:
+            label = category if category not in legend_seen else None
+            ax.bar(
+                xs,
+                values_by_category[category],
+                width=width,
+                bottom=bottoms,
+                color=colors[category],
+                label=label,
+            )
+            legend_seen.add(category)
+            bottoms = [
+                bottom + value
+                for bottom, value in zip(bottoms, values_by_category[category])
+            ]
+
+        for x, total in zip(xs, bottoms):
+            ax.text(
+                x,
+                total,
+                mode_label,
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                rotation=0,
+            )
+
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels([str(batch_size) for batch_size in batch_sizes])
+    ax.set_xlabel("Batch size")
+    ax.set_ylabel("Modeled peak memory (MB)")
+    ax.set_title(f"Peak Memory Breakdown by Batch Size: {model_name}")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+    return output_path
+
+
 def run_sweep(
     model_name: str,
     batch_sizes: List[int],
@@ -588,8 +634,8 @@ def run_sweep(
         for run in runs
     ]
     _write_csv(rows, output_dir / "sweep_results.csv")
-    _write_csv(rows, output_dir / "sweep_results_for_demo.csv")
 
+    # Standard plot artifacts used by the report.
     memory_plot = _plot_sweep(
         runs,
         metric="peak_memory_bytes_max",
@@ -604,6 +650,11 @@ def run_sweep(
         title=f"Iteration Latency vs Batch Size: {model_name}",
         output_path=output_dir / "latency_vs_batch_size.png",
     )
+    breakdown_plot = _plot_peak_memory_breakdown_sweep(
+        runs,
+        model_name=model_name,
+        output_path=output_dir / "peak_memory_breakdown_stacked.png",
+    )
 
     manifest = {
         "model_name": model_name,
@@ -611,6 +662,7 @@ def run_sweep(
         "runs": [asdict(run) for run in runs],
         "memory_plot": str(memory_plot),
         "latency_plot": str(latency_plot),
+        "breakdown_plot": str(breakdown_plot),
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, default=_json_default), encoding="utf-8"
@@ -622,10 +674,12 @@ def run_sweep(
         output_dir=str(output_dir),
         memory_plot=str(memory_plot),
         latency_plot=str(latency_plot),
+        breakdown_plot=str(breakdown_plot),
     )
 
 
 def parse_args() -> argparse.Namespace:
+    # CLI used for final experiments and smaller debug sweeps.
     parser = argparse.ArgumentParser(description="Run activation checkpointing benchmarks.")
     parser.add_argument("--model", choices=Experiment.model_names, required=True)
     parser.add_argument("--batch-sizes", nargs="+", type=int)
@@ -635,18 +689,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--debug-bert", action="store_true")
     parser.add_argument("--memory-budget-mb", type=float, default=None)
-    parser.add_argument("--min-savings-mb", type=float, default=1.0)
-    parser.add_argument("--max-recompute-ratio", type=float, default=0.35)
+    parser.add_argument("--min-savings-mb", type=float, default=0.25)
+    parser.add_argument("--max-recompute-ratio", type=float, default=1.0)
+    parser.add_argument("--max-candidates", type=int, default=8)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    # If batch sizes are not supplied, use the model-specific defaults.
     batch_sizes = args.batch_sizes or Experiment.default_batch_sizes[args.model]
+    # Command-line policy knobs are passed directly into the checkpoint planner.
     config = ActivationCheckpointConfig(
         memory_budget_mb=args.memory_budget_mb,
         min_savings_mb=args.min_savings_mb,
         max_recompute_ratio=args.max_recompute_ratio,
+        max_candidates=args.max_candidates,
     )
     result = run_sweep(
         model_name=args.model,

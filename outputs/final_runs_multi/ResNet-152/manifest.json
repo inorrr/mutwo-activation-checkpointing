@@ -12,14 +12,13 @@
       "model_name": "ResNet-152",
       "batch_size": 1,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 123.19016658390562,
-      "latency_ms_std": 12.03827953338623,
-      "peak_memory_bytes_avg": 1263505237.3333333,
-      "peak_memory_bytes_max": 1263680000.0,
+      "latency_ms_avg": 355.30906659550965,
+      "latency_ms_std": 30.85285186767578,
+      "peak_memory_bytes_avg": 1254480896.0,
+      "peak_memory_bytes_max": 1254480896.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\baseline\\peak_memory_breakdown.png",
       "plan_path": null,
       "rewritten_profiler_summary_path": null,
       "metadata": {
@@ -28,21 +27,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 1,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 169.0951333536456,
-      "latency_ms_std": 16.48078727722168,
-      "peak_memory_bytes_avg": 1249327616.0,
-      "peak_memory_bytes_max": 1249327616.0,
+      "latency_ms_avg": 325.89619994784397,
+      "latency_ms_std": 47.61644744873047,
+      "peak_memory_bytes_avg": 1271061504.0,
+      "peak_memory_bytes_max": 1271061504.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\ac\\peak_memory_breakdown.png",
       "plan_path": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\ac\\checkpoint_plan.json",
       "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_1\\ac\\rewritten_profiler_summary.json",
       "metadata": {
@@ -51,21 +49,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 2,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 128.11859992022315,
-      "latency_ms_std": 27.088993072509766,
-      "peak_memory_bytes_avg": 1556107776.0,
-      "peak_memory_bytes_max": 1556381184.0,
+      "latency_ms_avg": 309.7464999494453,
+      "latency_ms_std": 15.7556734085083,
+      "peak_memory_bytes_avg": 1542297600.0,
+      "peak_memory_bytes_max": 1542297600.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\baseline\\peak_memory_breakdown.png",
       "plan_path": null,
       "rewritten_profiler_summary_path": null,
       "metadata": {
@@ -74,21 +71,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 2,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 134.693133411929,
-      "latency_ms_std": 8.215034484863281,
-      "peak_memory_bytes_avg": 1259751936.0,
-      "peak_memory_bytes_max": 1259751936.0,
+      "latency_ms_avg": 292.69986661771935,
+      "latency_ms_std": 3.516465902328491,
+      "peak_memory_bytes_avg": 1479317504.0,
+      "peak_memory_bytes_max": 1479317504.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\ac\\peak_memory_breakdown.png",
       "plan_path": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\ac\\checkpoint_plan.json",
       "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_2\\ac\\rewritten_profiler_summary.json",
       "metadata": {
@@ -97,21 +93,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 4,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 180.03073326932886,
-      "latency_ms_std": 13.653355598449707,
-      "peak_memory_bytes_avg": 2287771136.0,
-      "peak_memory_bytes_max": 2287771136.0,
+      "latency_ms_avg": 343.90030009672046,
+      "latency_ms_std": 5.535767555236816,
+      "peak_memory_bytes_avg": 2279299584.0,
+      "peak_memory_bytes_max": 2279299584.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\baseline\\peak_memory_breakdown.png",
       "plan_path": null,
       "rewritten_profiler_summary_path": null,
       "metadata": {
@@ -120,21 +115,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 4,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 182.37919996803006,
-      "latency_ms_std": 4.433396339416504,
-      "peak_memory_bytes_avg": 1357428224.0,
-      "peak_memory_bytes_max": 1357428224.0,
+      "latency_ms_avg": 314.1915666249891,
+      "latency_ms_std": 1.0569428205490112,
+      "peak_memory_bytes_avg": 2176932352.0,
+      "peak_memory_bytes_max": 2176932352.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\ac\\peak_memory_breakdown.png",
       "plan_path": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\ac\\checkpoint_plan.json",
       "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_4\\ac\\rewritten_profiler_summary.json",
       "metadata": {
@@ -143,21 +137,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 6,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 215.84953321143985,
-      "latency_ms_std": 27.377525329589844,
-      "peak_memory_bytes_avg": 2986976938.6666665,
-      "peak_memory_bytes_max": 2987490304.0,
+      "latency_ms_avg": 437.83856664473814,
+      "latency_ms_std": 21.056970596313477,
+      "peak_memory_bytes_avg": 2991004160.0,
+      "peak_memory_bytes_max": 2991004160.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\baseline\\peak_memory_breakdown.png",
       "plan_path": null,
       "rewritten_profiler_summary_path": null,
       "metadata": {
@@ -166,21 +159,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 6,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 252.1880667967101,
-      "latency_ms_std": 18.188575744628906,
-      "peak_memory_bytes_avg": 1614971392.0,
-      "peak_memory_bytes_max": 1614971392.0,
+      "latency_ms_avg": 412.91646667135257,
+      "latency_ms_std": 5.055675983428955,
+      "peak_memory_bytes_avg": 2871073280.0,
+      "peak_memory_bytes_max": 2871073280.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\ac\\peak_memory_breakdown.png",
       "plan_path": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\ac\\checkpoint_plan.json",
       "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_6\\ac\\rewritten_profiler_summary.json",
       "metadata": {
@@ -189,21 +181,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 8,
       "use_activation_checkpointing": false,
-      "latency_ms_avg": 927.3286666721106,
-      "latency_ms_std": 16.751323699951172,
-      "peak_memory_bytes_avg": 3725657770.6666665,
-      "peak_memory_bytes_max": 3726793728.0,
+      "latency_ms_avg": 471.0230666678399,
+      "latency_ms_std": 33.89522171020508,
+      "peak_memory_bytes_avg": 3722041856.0,
+      "peak_memory_bytes_max": 3722041856.0,
       "correctness_ok": null,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\baseline",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\baseline\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\baseline\\peak_memory_breakdown.png",
       "plan_path": null,
       "rewritten_profiler_summary_path": null,
       "metadata": {
@@ -212,21 +203,20 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     },
     {
       "model_name": "ResNet-152",
       "batch_size": 8,
       "use_activation_checkpointing": true,
-      "latency_ms_avg": 312.68853329432505,
-      "latency_ms_std": 3.6072726249694824,
-      "peak_memory_bytes_avg": 1891496960.0,
-      "peak_memory_bytes_max": 1891496960.0,
+      "latency_ms_avg": 505.31610000568134,
+      "latency_ms_std": 38.47646713256836,
+      "peak_memory_bytes_avg": 3513670144.0,
+      "peak_memory_bytes_max": 3513670144.0,
       "correctness_ok": true,
       "output_dir": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\ac",
       "profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\ac\\profiler_summary.json",
-      "profiler_breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\ac\\peak_memory_breakdown.png",
       "plan_path": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\ac\\checkpoint_plan.json",
       "rewritten_profiler_summary_path": "outputs\\final_runs_multi\\ResNet-152\\bs_8\\ac\\rewritten_profiler_summary.json",
       "metadata": {
@@ -235,10 +225,11 @@
         "vocab_size": null,
         "image_size": 320,
         "debug_bert": false,
-        "measurement_mode": "eager_runtime_checkpointing"
+        "measurement_mode": "custom_fx_graph_rewrite"
       }
     }
   ],
   "memory_plot": "outputs\\final_runs_multi\\ResNet-152\\peak_memory_vs_batch_size.png",
-  "latency_plot": "outputs\\final_runs_multi\\ResNet-152\\latency_vs_batch_size.png"
+  "latency_plot": "outputs\\final_runs_multi\\ResNet-152\\latency_vs_batch_size.png",
+  "breakdown_plot": "outputs\\final_runs_multi\\ResNet-152\\peak_memory_breakdown_stacked.png"
 }
